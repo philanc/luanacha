@@ -3,19 +3,19 @@
 
 /*
 
-luamonocypher
+luanacha
 
 This is a Lua wrapper for the Monocypher library by Loup Vaillant.
 http://loup-vaillant.fr/projects/monocypher/
 
-luamonocypher API:
+luanachaAPI:
 
 func(...)
 	description...
 
 */
 
-#define LUAMONOCYPHER_VERSION "luamonocypher-0.1"
+#define LUANACHA_VERSION "luanacha-0.1"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -48,6 +48,10 @@ func(...)
 
 #endif
 
+//----------------------------------------------------------------------
+// lua binding   (all LuaNacha exposed functions are prefixed with "ln_")
+
+
 
 //----------------------------------------------------------------------
 // 
@@ -56,17 +60,17 @@ func(...)
 //------------------------------------------------------------
 // lua library declaration
 //
-static const struct luaL_Reg luamonocypherlib[] = {
+static const struct luaL_Reg luanachalib[] = {
 	{"fname", func},
 	
 	{NULL, NULL},
 };
 
-int luaopen_luamonocypher (lua_State *L) {
-	luaL_register (L, "luamonocypher", luamonocypherlib);
+int luaopen_luanacha(lua_State *L) {
+	luaL_register (L, "luanacha", luanachalib);
     // 
     lua_pushliteral (L, "VERSION");
-	lua_pushliteral (L, LUAMONOCYPHER_VERSION); 
+	lua_pushliteral (L, LUANACHA_VERSION); 
 	lua_settable (L, -3);
 	return 1;
 }

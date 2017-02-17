@@ -1,8 +1,10 @@
-# Lua-Monocypher  - *(work in progress!!)*
+# LuaNacha  - *(work in progress!!)*
 
-This is intended to be a Lua wrapper for the Monocypher cryptographic library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/).
+LuaNacha is a small Lua cryptographic library wrapping the excellent Monocypher cryptographic C library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/).
 
-Monocypher is heavily based on the NaCl crypto library by Daniel Bernstein and Tanja Lange.
+The Monocypher library is included here.
+
+Monocypher is itself heavily based on the NaCl crypto library by Daniel Bernstein and Tanja Lange.
 
 Major features and differences with the NaCl library:
 
@@ -15,6 +17,13 @@ Major features and differences with the NaCl library:
 The complete documentation of the Monocypher library is available at http://loup-vaillant.fr/projects/monocypher/manual
 
 Note:  As of February 2017, Monocypher is not deemed to be production-ready yet. (See section "Current state" at http://loup-vaillant.fr/projects/monocypher/)
+
+## The Lua wrapper
+
+It includes an interface to an OS random generator (for the moment only based on /dev/urandom and tested on Linux)
+
+XXXXX
+
 
 
 ## License
@@ -66,6 +75,7 @@ For the Blake2b code:
     THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
     SUCH DAMAGE.
 ```
-This Lua wrapper code is MIT-licensed.
+The LuaNacha wrapper code is MIT-licensed.
+
 
 

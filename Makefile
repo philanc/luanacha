@@ -17,14 +17,14 @@ INCFLAGS= -I$(LUADIR)/include
 CFLAGS= -Os -fPIC $(INCFLAGS) 
 LDFLAGS= -fPIC
 
-OBJS= luamonocypher.o monocypher.o 
+OBJS= luanacha.o monocypher.o randombytes.o
 
-luamonocypher.so:  src/*.c src/*.h
+luanacha.so:  src/*.c src/*.h
 	$(CC) -c $(CFLAGS) src/*.c
-	$(CC) -shared $(LDFLAGS) -o luamonocypher.so $(OBJS)
+	$(CC) -shared $(LDFLAGS) -o luanacha.so $(OBJS)
 
-test:  luamonocypher.so
-	$(LUA) test/test_luamonocypher.lua
+test:  luanacha.so
+	$(LUA) test/test_luanacha.lua
 	
 clean:
 	rm -f *.o *.a *.so
