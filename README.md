@@ -1,4 +1,4 @@
-# luamonocypher
+# Lua-Monocypher  - *(work in progress!!)*
 
 This is intended to be a Lua wrapper for the Monocypher cryptographic library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/).
 
