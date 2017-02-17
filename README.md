@@ -1,6 +1,21 @@
 # luamonocypher
 
-This is intended to be a Lua wrapper for the Monocypher cryptographic library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/)
+This is intended to be a Lua wrapper for the Monocypher cryptographic library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/).
+
+Monocypher is heavily based on the NaCl crypto library by Daniel Bernstein and Tanja Lange.
+
+Major features and differences with the NaCl library:
+
+* Authenticated encryption with Chacha20 stream encryption and Poly1305 MAC,
+* Curve25519-based key exchange and public key encryption,
+* Blake2b hash function,
+* Ed25519-based signature function using Blake2b hash instead of sha512,
+* Argon2i, a modern key derivation function based on Blake2b.
+
+The complete documentation of the Monocypher library is available at http://loup-vaillant.fr/projects/monocypher/manual
+
+Note:  As of February 2017, Monocypher is not deemed to be production-ready yet. (See section "Current state" at http://loup-vaillant.fr/projects/monocypher/)
+
 
 ## License
 
@@ -51,6 +66,6 @@ For the Blake2b code:
     THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
     SUCH DAMAGE.
 ```
-The Lua wrapper code is MIT-licensed.
+This Lua wrapper code is MIT-licensed.
 
 
