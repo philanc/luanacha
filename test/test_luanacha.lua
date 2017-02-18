@@ -56,7 +56,7 @@ local function hextos(hs, unsafe)
 		))
 end -- hextos
 
-local function px(s) print'--'; print(stohex(s, 8, " ")) end
+local function px(s) print'--'; print(stohex(s, 16, " ")) end
 
 print("------------------------------------------------------------")
 print(_VERSION)
@@ -68,16 +68,60 @@ t = "The quick brown fox jumps over the lazy dog"
 e = hextos(
 	"A8ADD4BDDDFD93E4877D2746E62817B116364A1FA7BC148D95090BC7333B3673" ..
 	"F82401CF7AA2E4CB1ECD90296E3F14CB5413F8ED77BE73045B13914CDCD6A918")
+	
+-- test convenience function
 dig = na.blake2b(t)
 assert(e == dig)
 
+-- test chunked interface
 ctx = na.blake2b_init()
 na.blake2b_update(ctx, "The q")
 na.blake2b_update(ctx, "uick brown fox jumps over the lazy dog")
 dig = na.blake2b_final(ctx)
 assert(e == dig)
 
+-- test shorter digests
+ctx = na.blake2b_init(5)
+na.blake2b_update(ctx, "The q")
+na.blake2b_update(ctx, "uick brown fox jumps over the lazy dog")
+dig51 = na.blake2b_final(ctx)
+px(dig51)
+ctx = na.blake2b_init(5)
+na.blake2b_update(ctx, "The quick b")
+na.blake2b_update(ctx, "rown fox jumps over the lazy dog")
+dig52 = na.blake2b_final(ctx)
+assert(#dig51 == 5 and dig51 == dig52)
 
+-- same, with a key
+ctx = na.blake2b_init(5, "somekey")
+na.blake2b_update(ctx, "The q")
+na.blake2b_update(ctx, "uick brown fox jumps over the lazy dog")
+dig53 = na.blake2b_final(ctx)
+px(dig53)
+ctx = na.blake2b_init(5, "somekey")
+na.blake2b_update(ctx, "The quick b")
+na.blake2b_update(ctx, "rown fox jumps over the lazy dog")
+dig54 = na.blake2b_final(ctx)
+assert(#dig53 == 5 and dig53 == dig54)
+
+ctx = na.blake2b_init(5, ("\0"):rep(0)) -- is it same as no key??
+na.blake2b_update(ctx, "The q")
+na.blake2b_update(ctx, "uick brown fox jumps over the lazy dog")
+dig55 = na.blake2b_final(ctx)
+assert(dig51==dig55)
+
+
+------------------------------------------------------------------------
+-- x25519 tests
+
+apk, ask = na.x25519_keypair() -- alice keypair
+bpk, bsk = na.x25519_keypair() -- bob keypair
+px(ask)
+px(bsk)
+k1 = na.lock_key(ask, bpk)
+k2 = na.lock_key(bsk, apk)
+
+assert(k1==k2)
 ------------------------------------------------------------------------
 -- ae_lock/unlock tests
 
