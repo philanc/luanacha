@@ -224,17 +224,83 @@ static int ln_lock_key(lua_State *L) {
 	// pk: "their" public key
 	// return the session key k
 	size_t pkln, skln;
-	u8 k[32];
+	unsigned char k[32];
 	const char *sk = luaL_checklstring(L,1,&skln); // your secret key
 	const char *pk = luaL_checklstring(L,2,&pkln); // their public key
 	if (pkln != 32) LERR("bad pk size");
 	if (skln != 32) LERR("bad sk size");
-	r = crypto_lock_key(k, sk, pk);
+	crypto_lock_key(k, sk, pk);
 	lua_pushlstring(L, k, 32); 
 	return 1;   
 }// ln_lock_key()
 
 
+//----------------------------------------------------------------------
+// ed25519 signature functions
+
+static int ln_ed25519_keypair(lua_State *L) {
+	// generates and return a pair of ed25519 signature keys 
+	// lua api: ed25519_keypair()
+	// return (sk, pk)
+	unsigned char pk[32];
+	unsigned char sk[32];
+	// sk is a random string. Then, compute the matching public key
+	randombytes(sk, 32);
+	crypto_ed25519_public_key(pk, sk);
+	lua_pushlstring (L, pk, 32); 
+	lua_pushlstring (L, sk, 32); 
+	return 2;
+}//ln_ed25519_keypair()
+
+static int ln_ed25519_public_key(lua_State *L) {
+	// return the public key associated to an ed25519 secret key
+	// lua api:  ed25519_public_key(sk) return pk
+	// sk: a secret key (can be any random value)
+	// pk: the matching public key
+	size_t skln;
+	unsigned char pk[32];
+	const char *sk = luaL_checklstring(L,1,&skln); // secret key
+	if (skln != 32) LERR("bad sk size");
+	crypto_ed25519_public_key(pk, sk);
+	lua_pushlstring (L, pk, 32); 
+	return 1;
+}//ln_ed25519_public_key()
+
+static int ln_ed25519_sign(lua_State *L) {
+	// sign a text with a secret key
+	// Lua API: ed25519_sign(sk, m) return sig
+	//  sk: key string (32 bytes)
+	//	m: message to sign (string)
+	//  return signature (a 64-byte string)
+	size_t mln, skln;
+	const char *sk = luaL_checklstring(L,1,&skln);
+	const char *m = luaL_checklstring(L,3,&mln);	
+	if (skln != 32) LERR("bad key size");
+	unsigned char sig[64];
+	crypto_ed25519_sign(sig, sk, m, mln);
+	lua_pushlstring (L, sig, 64); 
+	return 1;
+} // ln_ed25519_sign()
+
+static int ln_ed25519_check(lua_State *L) {
+	// check a text signature with a public key
+	// Lua API: ed25519_check(sig, pk, m) return boolean
+	//  sig: signature string (64 bytes)
+	//  pk: public key string (32 bytes)
+	//	m: message to verify (string)
+	//  return true if the signature match, or false
+	int r;
+	size_t mln, pkln, sigln;
+	const char *sig = luaL_checklstring(L,1,&sigln);
+	const char *pk = luaL_checklstring(L,1,&pkln);
+	const char *m = luaL_checklstring(L,3,&mln);	
+	if (sigln != 64) LERR("bad signature size");
+	if (pkln != 32) LERR("bad key size");
+	r = crypto_ed25519_check(sig, pk, m, mln);
+	// r == 0 if the signature matches
+	lua_pushboolean (L, (r == 0)); 
+	return 1;
+} // ln_ed25519_sign()
 
 
 //------------------------------------------------------------
@@ -242,12 +308,19 @@ static int ln_lock_key(lua_State *L) {
 //
 static const struct luaL_Reg luanachalib[] = {
 	{"randombytes", ln_randombytes},
+	//
 	{"ae_lock", ln_ae_lock},
 	{"ae_unlock", ln_ae_unlock},
+	//
 	{"x25519_keypair", ln_x25519_keypair},
 	{"x25519_public_key", ln_x25519_public_key},
 	{"lock_key", ln_lock_key},
-	
+	//
+	{"ed25519_keypair", ln_ed25519_keypair},
+	{"ed25519_public_key", ln_ed25519_public_key},	
+	{"ed25519_sign", ln_ed25519_sign},	
+	{"ed25519_check", ln_ed25519_check},	
+	//
 	{NULL, NULL},
 };
 
@@ -259,7 +332,4 @@ int luaopen_luanacha(lua_State *L) {
 	lua_settable (L, -3);
 	return 1;
 }
-
-===           TOC
-
 

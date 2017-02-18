@@ -80,7 +80,7 @@ ed25519_public_key(secretkey) => publickey
 ed25519_sign(secretkey, text) => signature
 	sign a text with a secret key
 
-ed25519_check(secretkey, text, signature) => boolean
+ed25519_check(signature, publickey, text) => boolean
 	check a text signature with a public key
 ```
 
