@@ -22,8 +22,65 @@ Note:  As of February 2017, Monocypher is not deemed to be production-ready yet.
 
 It includes an interface to an OS random generator (for the moment only based on /dev/urandom and tested on Linux)
 
-XXXXX
+The functions keep as much as possible the same name as in  Monocypher 
+(without the "crypto_" prefix)
 
+luanachaAPI:
+
+```
+randombytes(n)
+	return a string containing n random bytes
+	
+--- Authenticated encryption
+
+ae_lock(key, nonce, plain, [prefix]) => crypted
+	authenticated encryption
+	with an optional prefix prepended to the encrypted text
+
+ae_unlock(key, nonce, crypted, [offset]) => plain
+	authenticated decryption
+	with an optional offset for the start of the encrypted text
+
+--- Curve25519-based key exchange
+
+x25519_keypair()
+	generates a pair of curve25519 keys (secret key, public key)
+
+x25519_public_key(secretkey) => publickey
+	return the public key associated to a secret key
+
+lock_key(alice_secretkey, bob_publickey) => session key
+	DH key exchange. Return a session key
+
+--- Blake2b cryptographic hash
+
+blake2b_init([digest_size]) => ctx
+	initialize and return a blake2b context object
+
+blake2b_update(ctx, text_fragment)
+	update the hash with a new text fragment
+
+blake2b_final(ctx) => digest
+	return the final value of the hash
+
+blake2b(text) => digest
+	compute the hash of a string (convenience function)
+
+
+--- Ed25519 signature
+
+ed25519_keypair()
+	generates a pair of ed25519 signature keys (secret key, public key)
+
+ed25519_public_key(secretkey) => publickey
+	return the public key associated to a secret key
+
+ed25519_sign(secretkey, text) => signature
+	sign a text with a secret key
+
+ed25519_check(secretkey, text, signature) => boolean
+	check a text signature with a public key
+```
 
 
 ## License
