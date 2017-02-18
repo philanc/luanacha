@@ -142,7 +142,6 @@ static int ln_ae_lock(lua_State *L) {
 	const char *n = luaL_checklstring(L,2,&nln);	
 	const char *m = luaL_checklstring(L,3,&mln);	
 	const char *pfx = luaL_optlstring(L,4,"",&pfxln);
-	printf("pfxln: %d\n", pfxln);
 	if (nln != NONCEBYTES) LERR("bad nonce size");
 	if (kln != KEYBYTES) LERR("bad key size");
 	if ((pfxln % 8) != 0) LERR("bad prefix size");
@@ -183,13 +182,38 @@ static int ln_ae_unlock(lua_State *L) {
 		lua_pushliteral(L, "unlock error");
 		return 2;         
 	} 
-	// the first 32 bytes should be null. ignore them
-	// plain is 16 byte shorter than encrypted (the 16-byte MAC)
 	lua_pushlstring (L, buf, mln); 
 	free(buf);
 	return 1;
 } // ln_ae_unlock()
 
+static int ln_x25519_keypair(lua_State *L) {
+	// generate and return a random key pair (publickey, secretkey)
+	// lua api: x25519_keypair()
+	// return (sk, pk)
+	unsigned char pk[KEYBYTES];
+	unsigned char sk[KEYBYTES];
+	// sk is a random string. Then, compute the matching public key
+	randombytes(sk, KEYBYTES);
+	crypto_x25519_public_key(pk, sk);
+	lua_pushlstring (L, pk, KEYBYTES); 
+	lua_pushlstring (L, sk, KEYBYTES); 
+	return 2;
+}//ln_x25519_keypair()
+
+static int ln_x25519_public_key(lua_State *L) {
+	// return the public key associated to a secret key
+	// lua api:  x25519_public_key(sk) return pk
+	// sk: a secret key (can be any random value)
+	// pk: the matching public key
+	size_t skln;
+	unsigned char pk[KEYBYTES];
+	const char *sk = luaL_checklstring(L,1,&skln); // secret key
+	if (skln != KEYBYTES) LERR("bad sk size");
+	crypto_x25519_public_key(pk, sk);
+	lua_pushlstring (L, pk, KEYBYTES); 
+	return 1;
+}//ln_x25519_public_key()
 
 
 
@@ -213,3 +237,7 @@ int luaopen_luanacha(lua_State *L) {
 	lua_settable (L, -3);
 	return 1;
 }
+
+===           TOC
+
+
