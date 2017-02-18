@@ -107,8 +107,6 @@ ed25519_check
 
 # define LERR(msg) return luaL_error(L, msg)
 
-#define NONCEBYTES 24
-#define KEYBYTES 32
 
 
 extern void randombytes(unsigned char *x,unsigned long long xlen); 
@@ -142,8 +140,8 @@ static int ln_ae_lock(lua_State *L) {
 	const char *n = luaL_checklstring(L,2,&nln);	
 	const char *m = luaL_checklstring(L,3,&mln);	
 	const char *pfx = luaL_optlstring(L,4,"",&pfxln);
-	if (nln != NONCEBYTES) LERR("bad nonce size");
-	if (kln != KEYBYTES) LERR("bad key size");
+	if (nln != 24) LERR("bad nonce size");
+	if (kln != 32) LERR("bad key size");
 	if ((pfxln % 8) != 0) LERR("bad prefix size");
 	bufln = mln + 16 + pfxln;
 	unsigned char * buf = malloc(bufln);
@@ -170,8 +168,8 @@ static int ln_ae_unlock(lua_State *L) {
 	const char *n = luaL_checklstring(L,2,&nln);	
 	const char *c = luaL_checklstring(L,3,&cln);	
 	int i = luaL_optinteger(L,4, 0);	
-	if (nln != NONCEBYTES) LERR("bad nonce size");
-	if (kln != KEYBYTES) LERR("bad key size");
+	if (nln != 24) LERR("bad nonce size");
+	if (kln != 32) LERR("bad key size");
 	
 	unsigned char * buf = malloc(cln);
 	mln = cln - i - 16;
@@ -187,17 +185,20 @@ static int ln_ae_unlock(lua_State *L) {
 	return 1;
 } // ln_ae_unlock()
 
+//----------------------------------------------------------------------
+// curve25519 functions
+
 static int ln_x25519_keypair(lua_State *L) {
 	// generate and return a random key pair (publickey, secretkey)
 	// lua api: x25519_keypair()
 	// return (sk, pk)
-	unsigned char pk[KEYBYTES];
-	unsigned char sk[KEYBYTES];
+	unsigned char pk[32];
+	unsigned char sk[32];
 	// sk is a random string. Then, compute the matching public key
-	randombytes(sk, KEYBYTES);
+	randombytes(sk, 32);
 	crypto_x25519_public_key(pk, sk);
-	lua_pushlstring (L, pk, KEYBYTES); 
-	lua_pushlstring (L, sk, KEYBYTES); 
+	lua_pushlstring (L, pk, 32); 
+	lua_pushlstring (L, sk, 32); 
 	return 2;
 }//ln_x25519_keypair()
 
@@ -207,13 +208,31 @@ static int ln_x25519_public_key(lua_State *L) {
 	// sk: a secret key (can be any random value)
 	// pk: the matching public key
 	size_t skln;
-	unsigned char pk[KEYBYTES];
+	unsigned char pk[32];
 	const char *sk = luaL_checklstring(L,1,&skln); // secret key
-	if (skln != KEYBYTES) LERR("bad sk size");
+	if (skln != 32) LERR("bad sk size");
 	crypto_x25519_public_key(pk, sk);
-	lua_pushlstring (L, pk, KEYBYTES); 
+	lua_pushlstring (L, pk, 32); 
 	return 1;
 }//ln_x25519_public_key()
+
+static int ln_lock_key(lua_State *L) {
+	// DH key exchange: compute a session key
+	// lua api:  lock_key(sk, pk) => k
+	// !! beware, reversed order compared to nacl box_beforenm() !!
+	// sk: "your" secret key
+	// pk: "their" public key
+	// return the session key k
+	size_t pkln, skln;
+	u8 k[32];
+	const char *sk = luaL_checklstring(L,1,&skln); // your secret key
+	const char *pk = luaL_checklstring(L,2,&pkln); // their public key
+	if (pkln != 32) LERR("bad pk size");
+	if (skln != 32) LERR("bad sk size");
+	r = crypto_lock_key(k, sk, pk);
+	lua_pushlstring(L, k, 32); 
+	return 1;   
+}// ln_lock_key()
 
 
 
@@ -225,6 +244,9 @@ static const struct luaL_Reg luanachalib[] = {
 	{"randombytes", ln_randombytes},
 	{"ae_lock", ln_ae_lock},
 	{"ae_unlock", ln_ae_unlock},
+	{"x25519_keypair", ln_x25519_keypair},
+	{"x25519_public_key", ln_x25519_public_key},
+	{"lock_key", ln_lock_key},
 	
 	{NULL, NULL},
 };
