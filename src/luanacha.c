@@ -67,6 +67,11 @@ ed25519_sign
 ed25519_check
 	check a text signature with a public key
 
+---
+
+Links:
+https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29
+
 */
 
 #define LUANACHA_VERSION "luanacha-0.1"
@@ -238,6 +243,78 @@ static int ln_lock_key(lua_State *L) {
 //----------------------------------------------------------------------
 // blake2b hash functions
 
+static int ln_blake2b(lua_State *L) {
+	// compute the hash of a string (convenience function)
+	// with default parameters (64-byte digest, no key)
+	// lua api:  blake2b(m) return digest
+	// m: the string to be hashed
+	// digest: the blake2b hash (a 64-byte string)
+    size_t mln; 
+    const char *m = luaL_checklstring (L, 1, &mln);
+    char digest[64];
+    crypto_blake2b_general(digest, 64, 0, 0, m, mln);
+    lua_pushlstring (L, digest, 64); 
+    return 1;
+}// ln_blake2b
+
+static int ln_blake2b_init(lua_State *L) {
+	// create and initialize a blake2b context
+	// lua api:  blake2b_init([digln [, key]]) return ctx
+	// digln: the optional length of the digest to be computed 
+	// (between 1 and 64) - default value is 64
+	// key: an optional secret key, allowing blake2b to work as a MAC 
+	//    (if provided, key length must be between 1 and 64)
+	//    default is no key
+	// return ctx, a pointer to the blake2b context as a light userdata
+	// 
+	// NOTE: the caller must ensure that blake2b_final() will be called to
+	// free the context, and that the ctx varible will NOT be used after
+	// the call to blake2b_final() 
+	//
+    size_t keyln = 0; 
+    int digln = luaL_optinteger(L, 1, 64);
+    const char *key = luaL_optlstring(L, 2, NULL, &keyln);
+	if ((keyln < 0)||(keyln > 64)) LERR("bad key size");
+	if ((digln < 1)||(digln > 64)) LERR("bad digest size");
+    size_t ctxln = sizeof(crypto_blake2b_ctx);
+	crypto_blake2b_ctx *ctx = (crypto_blake2b_ctx *) malloc(ctxln);
+    crypto_blake2b_general_init(ctx, digln, key, keyln);
+	lua_pushlightuserdata(L, (void *)ctx);
+    return 1;
+}// ln_blake2b_init
+
+static int ln_blake2b_update(lua_State *L) {
+	// update the hash with a new text fragment
+	// lua api:  blake2b_update(ctx, t)
+	// ctx, a pointer to the blake2b context as a light userdata
+	//    (created by blake2b_init())
+	// t: a text fragment as a string
+	//
+	size_t tln; 
+	crypto_blake2b_ctx *ctx = (crypto_blake2b_ctx *) lua_touserdata(L, 1);
+    const char *t = luaL_checklstring (L, 2, &tln);
+	if (ctx == NULL) LERR("invalid ctx");	
+    crypto_blake2b_update(ctx, t, tln);
+    return 0;
+}// ln_blake2b_update
+
+
+static int ln_blake2b_final(lua_State *L) {
+	// return the final value of the hash (and free the context)
+	// lua api:  blake2b_final(ctx) return dig
+	// ctx, a pointer to the blake2b context as a light userdata
+	//    (created by blake2b_init())
+	// dig: the digest value as a string (string length depends on 
+	// the digln parameter used for blake2b_init() - default is 64
+	//
+	crypto_blake2b_ctx *ctx = (crypto_blake2b_ctx *) lua_touserdata(L, 1);
+	if (ctx == NULL) LERR("invalid ctx");	
+	int digln = ctx->output_size;
+	unsigned char dig[64];
+    crypto_blake2b_final(ctx, dig);
+    lua_pushlstring (L, dig, digln); 
+    return 1;
+}// ln_blake2b_final
 
 
 //----------------------------------------------------------------------
@@ -320,6 +397,9 @@ static const struct luaL_Reg luanachalib[] = {
 	{"x25519_keypair", ln_x25519_keypair},
 	{"x25519_public_key", ln_x25519_public_key},
 	{"lock_key", ln_lock_key},
+	//
+	{"blake2b", ln_blake2b},
+	{"blake2b", ln_blake2b},
 	//
 	{"ed25519_keypair", ln_ed25519_keypair},
 	{"ed25519_public_key", ln_ed25519_public_key},	
