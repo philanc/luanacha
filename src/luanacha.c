@@ -399,7 +399,9 @@ static const struct luaL_Reg luanachalib[] = {
 	{"lock_key", ln_lock_key},
 	//
 	{"blake2b", ln_blake2b},
-	{"blake2b", ln_blake2b},
+	{"blake2b_init", ln_blake2b_init},
+	{"blake2b_update", ln_blake2b_update},
+	{"blake2b_final", ln_blake2b_final},
 	//
 	{"ed25519_keypair", ln_ed25519_keypair},
 	{"ed25519_public_key", ln_ed25519_public_key},	
