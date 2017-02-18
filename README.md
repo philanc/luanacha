@@ -1,6 +1,8 @@
-# LuaNacha  - *(work in progress!!)*
+# 
 
-LuaNacha is a small Lua cryptographic library wrapping the excellent Monocypher cryptographic C library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/).
+# LuaNacha
+
+LuaNacha (*NaCl with Chacha20*) is a small Lua cryptographic library wrapping the excellent Monocypher cryptographic C library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/).
 
 The Monocypher library is included here.
 
@@ -8,7 +10,7 @@ Monocypher is itself heavily based on the NaCl crypto library by Daniel Bernstei
 
 Major features and differences with the NaCl library:
 
-* Authenticated encryption with Chacha20 stream encryption and Poly1305 MAC,
+* Authenticated encryption with Chacha20 stream encryption (more precisely Xchacha20, ie. Chacha with a 24-byte nonce) and Poly1305 MAC, 
 * Curve25519-based key exchange and public key encryption,
 * Blake2b hash function,
 * Ed25519-based signature function using Blake2b hash instead of sha512,
@@ -25,7 +27,7 @@ It includes an interface to an OS random generator (for the moment only based on
 The functions keep as much as possible the same name as in  Monocypher 
 (without the "crypto_" prefix)
 
-luanachaAPI:
+LuanachaAPI summary:
 
 ```
 randombytes(n)
