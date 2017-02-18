@@ -236,6 +236,11 @@ static int ln_lock_key(lua_State *L) {
 
 
 //----------------------------------------------------------------------
+// blake2b hash functions
+
+
+
+//----------------------------------------------------------------------
 // ed25519 signature functions
 
 static int ln_ed25519_keypair(lua_State *L) {
@@ -300,7 +305,7 @@ static int ln_ed25519_check(lua_State *L) {
 	// r == 0 if the signature matches
 	lua_pushboolean (L, (r == 0)); 
 	return 1;
-} // ln_ed25519_sign()
+} // ln_ed25519_check()
 
 
 //------------------------------------------------------------
