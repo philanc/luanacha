@@ -312,6 +312,7 @@ static int ln_blake2b_final(lua_State *L) {
 	int digln = ctx->output_size;
 	unsigned char dig[64];
     crypto_blake2b_final(ctx, dig);
+	free(ctx);
     lua_pushlstring (L, dig, digln); 
     return 1;
 }// ln_blake2b_final
