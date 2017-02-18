@@ -61,6 +61,28 @@ local function px(s) print'--'; print(stohex(s, 8, " ")) end
 print("------------------------------------------------------------")
 print(_VERSION)
 
+------------------------------------------------------------------------
+-- blake2b tests
+
+t = "The quick brown fox jumps over the lazy dog"
+e = hextos(
+	"A8ADD4BDDDFD93E4877D2746E62817B116364A1FA7BC148D95090BC7333B3673" ..
+	"F82401CF7AA2E4CB1ECD90296E3F14CB5413F8ED77BE73045B13914CDCD6A918")
+dig = na.blake2b(t)
+assert(e == dig)
+
+ctx = na.blake2b_init()
+na.blake2b_update(ctx, "The q")
+na.blake2b_update(ctx, "uick brown fox jumps over the lazy dog")
+dig = na.blake2b_final(ctx)
+assert(e == dig)
+
+
+------------------------------------------------------------------------
+-- ae_lock/unlock tests
+
+--[[  wait for loup!
+
 -- xchacha test from
 -- https://raw.githubusercontent.com/DaGenix/rust-crypto/master/src/chacha20.rs
 
@@ -111,7 +133,10 @@ px(c); px(e)
 
 
 
-print("luatweetnacl  ok")
+-- ]]
+
+
+print("test_luanacha  ok")
 print("------------------------------------------------------------")
 
 
