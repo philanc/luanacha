@@ -85,7 +85,6 @@ ctx = na.blake2b_init(5)
 na.blake2b_update(ctx, "The q")
 na.blake2b_update(ctx, "uick brown fox jumps over the lazy dog")
 dig51 = na.blake2b_final(ctx)
-px(dig51)
 ctx = na.blake2b_init(5)
 na.blake2b_update(ctx, "The quick b")
 na.blake2b_update(ctx, "rown fox jumps over the lazy dog")
@@ -97,7 +96,6 @@ ctx = na.blake2b_init(5, "somekey")
 na.blake2b_update(ctx, "The q")
 na.blake2b_update(ctx, "uick brown fox jumps over the lazy dog")
 dig53 = na.blake2b_final(ctx)
-px(dig53)
 ctx = na.blake2b_init(5, "somekey")
 na.blake2b_update(ctx, "The quick b")
 na.blake2b_update(ctx, "rown fox jumps over the lazy dog")
@@ -116,12 +114,11 @@ assert(dig51==dig55)
 
 apk, ask = na.x25519_keypair() -- alice keypair
 bpk, bsk = na.x25519_keypair() -- bob keypair
-px(ask)
-px(bsk)
+assert(apk == na.x25519_public_key(ask))
+
 k1 = na.lock_key(ask, bpk)
 k2 = na.lock_key(bsk, apk)
-
-assert(k1==k2)
+assert(k1 == k2)
 ------------------------------------------------------------------------
 -- ae_lock/unlock tests
 
