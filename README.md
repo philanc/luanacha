@@ -14,7 +14,7 @@ Major features and differences with the NaCl library:
 * Curve25519-based key exchange and public key encryption,
 * Blake2b hash function,
 * Ed25519-based signature function using Blake2b hash instead of sha512,
-* Argon2i, a modern key derivation function based on Blake2b.
+* Argon2i, a modern key derivation function based on Blake2b. *(not wrapped yet)*
 
 The complete documentation of the Monocypher library is available at http://loup-vaillant.fr/projects/monocypher/manual
 
