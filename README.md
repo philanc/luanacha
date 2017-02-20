@@ -25,9 +25,9 @@ Note:  As of February 2017, Monocypher is not deemed to be production-ready yet.
 It includes an interface to an OS random generator (for the moment only based on /dev/urandom and tested on Linux)
 
 The functions keep as much as possible the same name as in  Monocypher 
-(without the "crypto_" prefix)
+(without the "crypto_" prefix) and the same parameter order.
 
-LuanachaAPI summary:
+Luanacha API summary:
 
 ```
 randombytes(n)
@@ -36,52 +36,123 @@ randombytes(n)
 --- Authenticated encryption
 
 ae_lock(key, nonce, plain, [prefix]) => crypted
-	authenticated encryption
-	with an optional prefix prepended to the encrypted text
+	authenticated encryption using Xchacha20 and a Poly1305 MAC
+	key must be a 32-byte string
+	nonce must be a 24-byte string
+	plain is the text to encrypt as a string
+	prefix is an optional string. If it is provided, it is prepended 
+	to the encrypted text. The prefix can be use for example to 
+	store the nonce. It defaults to the empty string.
+	Return the encrypted text as a string. The encrypted text includes 
+	the 16-byte MAC. So #crypted == #plain + 16 + #prefix
+	
+	Note: the prefix is not an "additional data" in the AEAD sense.
+	The MAC is computed over the encrypted text. It does not include 
+	the prefix.
+
 
 ae_unlock(key, nonce, crypted, [offset]) => plain
-	authenticated decryption
-	with an optional offset for the start of the encrypted text
+	authenticated decryption - verification of the Poly1305 MAC
+	and decryption with Xcahcha20.
+	key must be a 32-byte string
+	nonce must be a 24-byte string
+	crypted is the text to decrypt as a string
+	offset is an optional integer. It is the length of the prefix used 
+	by ae_lock() if any. It defaults to 0.
+	Return the decrypted text as a string or nil if the MAC 
+	verification fails.
+	
+	Note: the responsibility of using matching prefix and offset belongs 
+	to the application.
+	
 
 --- Curve25519-based key exchange
 
-x25519_keypair()
-	generates a pair of curve25519 keys (secret key, public key)
-
-x25519_public_key(secretkey) => publickey
+x25519_public_key(sk) => pk
 	return the public key associated to a secret key
+	sk is the secret key as a 32-byte string
+	pk is the associated public key as a 32-byte string
 
-lock_key(alice_secretkey, bob_publickey) => session key
-	DH key exchange. Return a session key
+x25519_keypair() => pk, sk
+	generates a pair of curve25519 keys (public key, secret key)
+	pk is the public key as a 32-byte string
+	sk is the secret key as a 32-byte string
+	
+	Note: This is a convenience function:
+		pk, sk = x25519_keypair()
+		--is equivalent to
+		sk = randombytes(32); pk = x25519_public_key(sk)
+
+lock_key(sk, pk) => k
+	DH key exchange. Return a session key k used to encrypt 
+	or decrypt a text.
+	sk is the secret key of the party invoking the function 
+	("our secret key"). 
+	pk is the public key of the other party 
+	("their public key").
+	sk, pk and k are 32-byte strings
 
 --- Blake2b cryptographic hash
 
 blake2b_init([digest_size]) => ctx
 	initialize and return a blake2b context object
+	digest_size is the optional length of the expected digest. 
+	If provided, it must be an integer between 1 and 64.
+	It defaults to 64.
+	ctx is a pointer to the blake2b context as a light userdata
 
 blake2b_update(ctx, text_fragment)
 	update the hash with a new text fragment
+	ctx is a pointer to a blake2b context as a light userdata
 
 blake2b_final(ctx) => digest
 	return the final value of the hash
+	ctx is a pointer to a blake2b context as a light userdata
+	The digest is returned as a string. The length of the digest
+	has been defined at the context creation (see blake2b_init()).
+	It defaults to 64.
 
 blake2b(text) => digest
-	compute the hash of a string (convenience function)
+	compute the hash of a string. 
+	Returns a 64-byte digest.
+	This is a convenience function which combines the init(), 
+	update() and final() functions above.
 
 
 --- Ed25519 signature
 
-ed25519_keypair()
-	generates a pair of ed25519 signature keys (secret key, public key)
-
-ed25519_public_key(secretkey) => publickey
+ed25519_public_key(sk) => pk
 	return the public key associated to a secret key
+	sk is the secret key as a 32-byte string
+	pk is the associated public key as a 32-byte string
 
-ed25519_sign(secretkey, text) => signature
+ed25519_keypair() => pk, sk
+	generates a pair of ed25519 signature keys (public key, secret key)
+	pk is the public signature key as a 32-byte string
+	sk is the secret signature key as a 32-byte string
+
+	Note: This is a convenience function:
+		pk, sk = ed25519_keypair()
+		--is equivalent to
+		sk = randombytes(32); pk = ed25519_public_key(sk)
+
+ed25519_sign(sk, text) => sig
 	sign a text with a secret key
+	sk is the secret key as a 32-byte string
+	text is the text to sign as a string
+	Return the text signature as a 64-byte string.
 
-ed25519_check(signature, publickey, text) => boolean
+ed25519_check(sig, pk, text) => is_valid
 	check a text signature with a public key
+	sig is the signature to verify, as a 64-byte string
+	pk is the public key as a 32-byte string
+	text is the signed text
+	Return a boolean indicating if the signature is valid or not.
+	
+	Note: curve25519 key pairs (generated with x25519_keypair())
+	cannot be used for ed25519 signature. The signature key pairs 
+	must be generated with ed25519_keypair().
+
 ```
 
 
