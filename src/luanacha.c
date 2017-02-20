@@ -385,6 +385,33 @@ static int ln_ed25519_check(lua_State *L) {
 	return 1;
 } // ln_ed25519_check()
 
+//------------------------------------------------------------
+// argon2i password derivation
+//
+
+static int ln_argon2i(lua_State *L) {
+	// Lua API: argon2i(pw, salt, nkb, niters) => k
+	// pw: the password string
+	// salt: some entropy as a string (typically 16 bytes)
+	// nkb:  number of kilobytes used in RAM (as large as possible)
+	// niters: number of iterations (as large as possible, >= 10)
+	//  return k, a key string (32 bytes)
+	size_t pwln, saltln, kln, mln;
+	const char *pw = luaL_checklstring(L,1,&pwln);
+	const char *salt = luaL_checklstring(L,2,&saltln);	
+	int nkb = luaL_checkinteger(L,3);	
+	int niters = luaL_checkinteger(L,4);	
+	unsigned char k[32];
+	size_t worksize = nkb * 1024;
+	unsigned char *work= malloc(worksize);
+	crypto_argon2i(	k, 32, pw, pwln, salt, saltln, 
+					"", 0, "", 0,  	// optional key and additional data
+					work, nkb, niters);
+
+	lua_pushlstring (L, k, 32); 
+	free(work);
+	return 1;
+} // ln_argon2i()
 
 //------------------------------------------------------------
 // lua library declaration
@@ -408,6 +435,8 @@ static const struct luaL_Reg luanachalib[] = {
 	{"ed25519_public_key", ln_ed25519_public_key},	
 	{"ed25519_sign", ln_ed25519_sign},	
 	{"ed25519_check", ln_ed25519_check},	
+	//
+	{"argon2i", ln_argon2i},	
 	//
 	{NULL, NULL},
 };

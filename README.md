@@ -14,7 +14,8 @@ Major features and differences with the NaCl library:
 * Curve25519-based key exchange and public key encryption,
 * Blake2b hash function,
 * Ed25519-based signature function using Blake2b hash instead of sha512,
-* Argon2i, a modern key derivation function based on Blake2b. *(not wrapped yet)*
+* Argon2i, a modern key derivation function based on Blake2b. Like 
+scrypt, it is designed to be expensive in both CPU and memory.
 
 The complete documentation of the Monocypher library is available at http://loup-vaillant.fr/projects/monocypher/manual
 
@@ -153,6 +154,24 @@ ed25519_check(sig, pk, text) => is_valid
 	cannot be used for ed25519 signature. The signature key pairs 
 	must be generated with ed25519_keypair().
 
+--- Argon2i password derivation 
+
+argon2i(pw, salt, nkb, niter) => k
+	compute a key given a password and some salt
+	This is a password key derivation function similar to scrypt.
+	It is intended to make derivation expensive in both CPU and memory.
+	pw: the password string
+	salt: some entropy as a string (typically 16 bytes)
+	nkb:  number of kilobytes used in RAM (as large as possible)
+	niter: number of iterations (as large as possible, >= 10)
+	Return k, a key string (32 bytes).
+
+	For example: on a CPU i5 M430 @ 2.27 GHz laptop,
+	with nkb=100000 (100MB) and niter=10, the derivation takes ~ 1.8 sec
+	
+	Note: this implementation has no threading support, so no parallel 
+	execution.
+	
 ```
 
 

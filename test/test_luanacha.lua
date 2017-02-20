@@ -177,6 +177,16 @@ px(c); px(e)
 -- ]]
 
 
+------------------------------------------------------------------------
+-- password derivation argon2i tests
+
+pw = "hello"
+salt = "salt salt salt"
+c0 = os.clock()
+k = na.argon2i(pw, salt, 100000, 10)
+print("argon2i (100MB, 10 iter) Execution time (sec): ", os.clock()-c0)
+px(k, "argon2i k")
+
 print("test_luanacha  ok")
 print("------------------------------------------------------------")
 
