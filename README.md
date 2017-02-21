@@ -175,6 +175,21 @@ argon2i(pw, salt, nkb, niter) => k
 	
 ```
 
+## Building 
+
+Adjust the Makefile according to your Lua installation.
+
+Targets:
+```
+	make          -- build luanacha.so
+	make test     -- build luanacha.so if needed, 
+	                 then run test/test_luanacha.lua
+	make clean
+	
+	make LUA=/path/to/lua LUAINC=/path/to/lua_include_dir test
+```
+
+Yes, a rockspec is due :-)
 
 ## License
 

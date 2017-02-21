@@ -1,19 +1,25 @@
 
 # ----------------------------------------------------------------------
-# adjust the following to the location of your Lua install
+# adjust the following according to your Lua install
 #
+#	LUADIR can be defined. In that case, 
 #   Lua binary and include files are to be found repectively in 
 #   $(LUADIR)/bin and $(LUADIR)/include
+#
+#	Or LUA and LUAINC can be directly defined as the path of the 
+#	Lua executable and the path of the Lua include directory,
+#	respectively.
 
 LUADIR ?= ../lua
+LUA ?= $(LUADIR)/bin/lua
+LUAINC ?= $(LUADIR)/include
 
 # ----------------------------------------------------------------------
 
-CC= gcc
-AR= ar
-LUA ?= $(LUADIR)/bin/lua
+CC ?= gcc
+AR ?= ar
 
-INCFLAGS= -I$(LUADIR)/include
+INCFLAGS= -I$(LUAINC)
 CFLAGS= -Os -fPIC $(INCFLAGS) 
 LDFLAGS= -fPIC
 
@@ -30,4 +36,5 @@ clean:
 	rm -f *.o *.a *.so
 
 .PHONY: clean test
+
 
