@@ -26,12 +26,13 @@ It includes an interface to an OS random generator (for the moment only based on
 The functions keep as much as possible the same name as in  Monocypher 
 (without the "crypto_" prefix) and the same parameter order.
 
-Luanacha API summary:
+LuaNacha API summary:
 
 ```
 randombytes(n)
 	return a string containing n random bytes
-	
+
+
 --- Authenticated encryption
 
 ae_lock(key, nonce, plain [, prefix]) => crypted
@@ -92,22 +93,25 @@ lock_key(sk, pk) => k
 	("their public key").
 	sk, pk and k are 32-byte strings
 
+
 --- Blake2b cryptographic hash
 
-blake2b_init([digest_size]) => ctx
+blake2b_init([digest_size [, key]]) => ctx
 	initialize and return a blake2b context object
-	digest_size is the optional length of the expected digest. 
-	If provided, it must be an integer between 1 and 64.
-	It defaults to 64.
-	ctx is a pointer to the blake2b context as a light userdata
+	digest_size is the optional length of the expected digest. If provided,
+	it must be an integer between 1 and 64. It defaults to 64.
+	key is an optional key allowing to use blake2b as a MAC function.
+	If provided, key is a string with a length that must be between 
+	1 and 64. The default is no key.
+	ctx is a pointer to the blake2b context as a light userdata.
 
 blake2b_update(ctx, text_fragment)
 	update the hash with a new text fragment
-	ctx is a pointer to a blake2b context as a light userdata
+	ctx is a pointer to a blake2b context as a light userdata.
 
 blake2b_final(ctx) => digest
 	return the final value of the hash
-	ctx is a pointer to a blake2b context as a light userdata
+	ctx is a pointer to a blake2b context as a light userdata.
 	The digest is returned as a string. The length of the digest
 	has been defined at the context creation (see blake2b_init()).
 	It defaults to 64.
@@ -152,6 +156,7 @@ ed25519_check(sig, pk, text) => is_valid
 	Note: curve25519 key pairs (generated with x25519_keypair())
 	cannot be used for ed25519 signature. The signature key pairs 
 	must be generated with ed25519_keypair().
+
 
 --- Argon2i password derivation 
 

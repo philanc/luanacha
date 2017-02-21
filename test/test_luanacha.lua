@@ -91,6 +91,7 @@ assert(#c == #e+16)
 -- the 32 first bytes of e are used for the MAC key
 -- the first 16 bytes of c are the MAC
 -- so we compare e:sub(33) with c:sub(17, #c-32)
+--
 --~ px(c:sub(17, #c-32), 'c'); 
 --~ px(e:sub(33), 'e')
 assert(e:sub(33) == c:sub(17, #c-32))
