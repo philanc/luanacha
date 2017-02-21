@@ -36,23 +36,24 @@ randombytes(n)
 	
 --- Authenticated encryption
 
-ae_lock(key, nonce, plain, [prefix]) => crypted
+ae_lock(key, nonce, plain [, prefix]) => crypted
 	authenticated encryption using Xchacha20 and a Poly1305 MAC
 	key must be a 32-byte string
 	nonce must be a 24-byte string
 	plain is the text to encrypt as a string
 	prefix is an optional string. If it is provided, it is prepended 
 	to the encrypted text. The prefix can be use for example to 
-	store the nonce. It defaults to the empty string.
+	store the nonce, and avoid extra string allocation and copying in 
+	Lua applications. The prefix defaults to the empty string.
 	Return the encrypted text as a string. The encrypted text includes 
 	the 16-byte MAC. So #crypted == #plain + 16 + #prefix
 	
 	Note: the prefix is not an "additional data" in the AEAD sense.
-	The MAC is computed over the encrypted text. It does not include 
+	The MAC is computed over only the encrypted text. It does not include 
 	the prefix.
 
 
-ae_unlock(key, nonce, crypted, [offset]) => plain
+ae_unlock(key, nonce, crypted [, offset]) => plain
 	authenticated decryption - verification of the Poly1305 MAC
 	and decryption with Xcahcha20.
 	key must be a 32-byte string

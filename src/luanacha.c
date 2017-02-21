@@ -357,7 +357,7 @@ static int ln_ed25519_sign(lua_State *L) {
 	//  return signature (a 64-byte string)
 	size_t mln, skln;
 	const char *sk = luaL_checklstring(L,1,&skln);
-	const char *m = luaL_checklstring(L,3,&mln);	
+	const char *m = luaL_checklstring(L,2,&mln);	
 	if (skln != 32) LERR("bad key size");
 	unsigned char sig[64];
 	crypto_ed25519_sign(sig, sk, m, mln);
@@ -375,7 +375,7 @@ static int ln_ed25519_check(lua_State *L) {
 	int r;
 	size_t mln, pkln, sigln;
 	const char *sig = luaL_checklstring(L,1,&sigln);
-	const char *pk = luaL_checklstring(L,1,&pkln);
+	const char *pk = luaL_checklstring(L,2,&pkln);
 	const char *m = luaL_checklstring(L,3,&mln);	
 	if (sigln != 64) LERR("bad signature size");
 	if (pkln != 32) LERR("bad key size");
