@@ -1,5 +1,3 @@
-# *(work in progress!!)*
-
 # LuaNacha
 
 LuaNacha (*NaCl with Chacha20*) is a small Lua cryptographic library wrapping the excellent Monocypher cryptographic C library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/).
