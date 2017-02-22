@@ -30,7 +30,7 @@ luanacha.so:  src/*.c src/*.h
 	$(CC) -shared $(LDFLAGS) -o luanacha.so $(OBJS)
 
 test:  luanacha.so
-	$(LUA) test/test_luanacha.lua
+	$(LUA) test_luanacha.lua
 	
 clean:
 	rm -f *.o *.a *.so

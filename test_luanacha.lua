@@ -62,17 +62,18 @@ local function px(s, msg)
 end
 
 print("------------------------------------------------------------")
-print(_VERSION)
+print(_VERSION, na.VERSION )
+print("------------------------------------------------------------")
 
 ------------------------------------------------------------------------
--- ae_lock/unlock tests
+-- lock/unlock tests
 
-print("testing ae_lock/unlock...")
+print("testing authenticated encryption...")
 
--- ae_lock stream encryption - test with Xchacha20 test vectors
+-- lock stream encryption - test with Xchacha20 test vectors
 --
--- ae_lock() uses the first 32 bytes of the xchacha encryption stream
--- to generate the poly1305 MAC key. So ae_lock stream must be compared 
+-- lock() uses the first 32 bytes of the xchacha encryption stream
+-- to generate the poly1305 MAC key. So lock stream must be compared 
 -- with xchacha20 stream at offset 32.
 
 -- xchacha test vector from
@@ -86,15 +87,18 @@ e = hextos(
 	"970d14e05c5b173193fb14f51c41f393835bf7f416a7e0bba81ffb8b13af0e21" ..
 	"691d7ecec93b75e6e4183a")
 m = string.rep('\0', #e)
-c = na.ae_lock(k, n, m)
+c = na.lock(k, n, m)
 assert(#c == #e+16)
 -- the 32 first bytes of e are used for the MAC key
 -- the first 16 bytes of c are the MAC
 -- so we compare e:sub(33) with c:sub(17, #c-32)
 --
+--~ px(e, 'e')
+--~ px(c, 'c')
 --~ px(c:sub(17, #c-32), 'c'); 
 --~ px(e:sub(33), 'e')
 assert(e:sub(33) == c:sub(17, #c-32))
+
 
 -- xchacha test vector from libsodium
 -- https://github.com/jedisct1/libsodium/blob/master/test/default/xchacha20.c
@@ -104,18 +108,19 @@ e = hextos(
 	"23839f61795c3cdbcee2c749a92543baeeea3cbb721402aa42e6cae140447575" ..
 	"f2916c5d71108e3b13357eaf86f060cb")
 m = string.rep('\0', #e)
-c = na.ae_lock(k, n, m)
+c = na.lock(k, n, m)
 assert(e:sub(33) == c:sub(17, #c-32))
 
--- ae_unlock
-m2 = na.ae_unlock(k, n, c)
+-- unlock
+m2, msg = na.unlock(k, n, c)
+assert(m2)
 assert(m2 == m)
 
 -- prefix and offset - prepend the nonce:
-c = na.ae_lock(k, n, m, n)
+c = na.lock(k, n, m, n)
 assert(#c == #m + 16 + #n)
 n2 = c:sub(1,24)
-m2 = na.ae_unlock(k, n2, c, #n2)
+m2 = na.unlock(k, n2, c, #n2)
 assert(m2 == m)
 
 ------------------------------------------------------------------------
@@ -171,14 +176,14 @@ assert(dig51==dig55)
 ------------------------------------------------------------------------
 -- x25519 tests
 
-print("testing x25519...")
+print("testing x25519 key exchange...")
 
 apk, ask = na.x25519_keypair() -- alice keypair
 bpk, bsk = na.x25519_keypair() -- bob keypair
 assert(apk == na.x25519_public_key(ask))
 
-k1 = na.lock_key(ask, bpk)
-k2 = na.lock_key(bsk, apk)
+k1 = na.key_exchange(ask, bpk)
+k2 = na.key_exchange(bsk, apk)
 assert(k1 == k2)
 
 
@@ -189,18 +194,18 @@ print("testing ed25519 signature...")
 
 t = "The quick brown fox jumps over the lazy dog"
 
-pk, sk = na.ed25519_keypair() -- signature keypair
-assert(pk == na.ed25519_public_key(sk))
+pk, sk = na.sign_keypair() -- signature keypair
+assert(pk == na.sign_public_key(sk))
 
-sig = na.ed25519_sign(sk, t)
+sig = na.sign(sk, pk, t)
 assert(#sig == 64)
 --~ px(sig, 'sig')
 
 -- check signature
-assert(na.ed25519_check(sig, pk, t))
+assert(na.check(sig, pk, t))
 
 -- modified text doesn't check
-assert(not na.ed25519_check(sig, pk, t .. "!"))
+assert(not na.check(sig, pk, t .. "!"))
 
 
 ------------------------------------------------------------------------

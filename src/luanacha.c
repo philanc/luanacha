@@ -8,6 +8,8 @@ luanacha
 This is a Lua library wrapping the Monocypher library by Loup Vaillant.
 http://loup-vaillant.fr/projects/monocypher/
 
+Current Monocypher version is 0.2
+
 The functions keep as much as possible the same name as in  Monocypher 
 (without the "crypto_" prefix)
 
@@ -18,11 +20,11 @@ randombytes(n)
 	
 --- Authenticated encryption
 
-ae_lock
+lock
 	authenticated encryption
 	with an optional prefix prepended to the encrypted text
 
-ae_unlock
+unlock
 	authenticated decryption
 	with an optional offset for the start of the encrypted text
 
@@ -55,16 +57,16 @@ blake2b
 
 --- Ed25519 signature
 
-ed25519_keypair
+sign_keypair
 	generates a pair of ed25519 signature keys (secret key, public key)
 
-ed25519_public_key
-	return the public key associated to a secret key
+sign_public_key
+	return the public key associated to a signature secret key
 
-ed25519_sign
+sign
 	sign a text with a secret key
 
-ed25519_check
+check
 	check a text signature with a public key
 
 ---
@@ -74,7 +76,7 @@ https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29
 
 */
 
-#define LUANACHA_VERSION "luanacha-0.1"
+#define LUANACHA_VERSION "luanacha-0.2"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -131,8 +133,8 @@ static int ln_randombytes(lua_State *L) {
 //----------------------------------------------------------------------
 // authenticated encryption
 
-static int ln_ae_lock(lua_State *L) {
-	// Lua API: ae_lock(k, n, m [, pfx])
+static int ln_lock(lua_State *L) {
+	// Lua API: lock(k, n, m [, pfx])
 	//  k: key string (32 bytes)
 	//  n: nonce string (24 bytes)
 	//	m: message (plain text) string 
@@ -150,17 +152,17 @@ static int ln_ae_lock(lua_State *L) {
 	if ((pfxln % 8) != 0) LERR("bad prefix size");
 	bufln = mln + 16 + pfxln;
 	unsigned char * buf = malloc(bufln);
-	crypto_ae_lock(buf+pfxln, k, n, m, mln);
+	crypto_lock(buf+pfxln, k, n, m, mln);
 	if (pfxln > 0) {
 		memcpy(buf, pfx, pfxln);
 	}
 	lua_pushlstring (L, buf, bufln); 
 	free(buf);
 	return 1;
-} // ae_lock()
+} // lock()
 
-static int ln_ae_unlock(lua_State *L) {
-	// Lua API: ae_unlock(k, n, c [, i])
+static int ln_unlock(lua_State *L) {
+	// Lua API: unlock(k, n, c [, i])
 	//  k: key string (32 bytes)
 	//  n: nonce string (24 bytes)
 	//	c: encrypted message string 
@@ -168,7 +170,7 @@ static int ln_ae_unlock(lua_State *L) {
 	//     default value is 0 - useful if c starts with a prefix
 	//  return plain text string or (nil, error msg if MAC is not valid)
 	int r = 0;
-	size_t cln, nln, kln, mln;
+	size_t cln, nln, kln, boxln;
 	const char *k = luaL_checklstring(L,1,&kln);
 	const char *n = luaL_checklstring(L,2,&nln);	
 	const char *c = luaL_checklstring(L,3,&cln);	
@@ -177,18 +179,18 @@ static int ln_ae_unlock(lua_State *L) {
 	if (kln != 32) LERR("bad key size");
 	
 	unsigned char * buf = malloc(cln);
-	mln = cln - i - 16;
-	r = crypto_ae_unlock(buf, k, n, c+i, mln);
+	boxln = cln - i;
+	r = crypto_unlock(buf, k, n, c+i, boxln);
 	if (r != 0) { 
 		free(buf); 
 		lua_pushnil (L);
 		lua_pushliteral(L, "unlock error");
 		return 2;         
 	} 
-	lua_pushlstring (L, buf, mln); 
+	lua_pushlstring (L, buf, boxln-16); 
 	free(buf);
 	return 1;
-} // ln_ae_unlock()
+} // ln_unlock()
 
 //----------------------------------------------------------------------
 // curve25519 functions
@@ -221,7 +223,7 @@ static int ln_x25519_public_key(lua_State *L) {
 	return 1;
 }//ln_x25519_public_key()
 
-static int ln_lock_key(lua_State *L) {
+static int ln_key_exchange(lua_State *L) {
 	// DH key exchange: compute a session key
 	// lua api:  lock_key(sk, pk) => k
 	// !! beware, reversed order compared to nacl box_beforenm() !!
@@ -234,10 +236,10 @@ static int ln_lock_key(lua_State *L) {
 	const char *pk = luaL_checklstring(L,2,&pkln); // their public key
 	if (pkln != 32) LERR("bad pk size");
 	if (skln != 32) LERR("bad sk size");
-	crypto_lock_key(k, sk, pk);
+	crypto_key_exchange(k, sk, pk);
 	lua_pushlstring(L, k, 32); 
 	return 1;   
-}// ln_lock_key()
+}// ln_key_exchange()
 
 
 //----------------------------------------------------------------------
@@ -321,53 +323,55 @@ static int ln_blake2b_final(lua_State *L) {
 //----------------------------------------------------------------------
 // ed25519 signature functions
 
-static int ln_ed25519_keypair(lua_State *L) {
+static int ln_sign_keypair(lua_State *L) {
 	// generates and return a pair of ed25519 signature keys 
-	// lua api: ed25519_keypair()
-	// return (sk, pk)
+	// lua api: sign_keypair()  return (sk, pk)
 	unsigned char pk[32];
 	unsigned char sk[32];
 	// sk is a random string. Then, compute the matching public key
 	randombytes(sk, 32);
-	crypto_ed25519_public_key(pk, sk);
+	crypto_sign_public_key(pk, sk);
 	lua_pushlstring (L, pk, 32); 
 	lua_pushlstring (L, sk, 32); 
 	return 2;
-}//ln_ed25519_keypair()
+}//ln_sign_keypair()
 
-static int ln_ed25519_public_key(lua_State *L) {
+static int ln_sign_public_key(lua_State *L) {
 	// return the public key associated to an ed25519 secret key
-	// lua api:  ed25519_public_key(sk) return pk
+	// lua api:  sign_public_key(sk) return pk
 	// sk: a secret key (can be any random value)
 	// pk: the matching public key
 	size_t skln;
 	unsigned char pk[32];
 	const char *sk = luaL_checklstring(L,1,&skln); // secret key
 	if (skln != 32) LERR("bad sk size");
-	crypto_ed25519_public_key(pk, sk);
+	crypto_sign_public_key(pk, sk);
 	lua_pushlstring (L, pk, 32); 
 	return 1;
-}//ln_ed25519_public_key()
+}//ln_sign_public_key()
 
-static int ln_ed25519_sign(lua_State *L) {
+static int ln_sign(lua_State *L) {
 	// sign a text with a secret key
-	// Lua API: ed25519_sign(sk, m) return sig
+	// Lua API: sign(sk, pk, m) return sig
 	//  sk: key string (32 bytes)
+	//  pk: associated public key string (32 bytes)
 	//	m: message to sign (string)
 	//  return signature (a 64-byte string)
-	size_t mln, skln;
+	size_t mln, skln, pkln;
 	const char *sk = luaL_checklstring(L,1,&skln);
-	const char *m = luaL_checklstring(L,2,&mln);	
+	const char *pk = luaL_checklstring(L,2,&pkln);
+	const char *m = luaL_checklstring(L,3,&mln);	
 	if (skln != 32) LERR("bad key size");
+	if (pkln != 32) LERR("bad pub key size");
 	unsigned char sig[64];
-	crypto_ed25519_sign(sig, sk, m, mln);
+	crypto_sign(sig, sk, pk, m, mln);
 	lua_pushlstring (L, sig, 64); 
 	return 1;
-} // ln_ed25519_sign()
+} // ln_sign()
 
-static int ln_ed25519_check(lua_State *L) {
+static int ln_check(lua_State *L) {
 	// check a text signature with a public key
-	// Lua API: ed25519_check(sig, pk, m) return boolean
+	// Lua API: check(sig, pk, m) return boolean
 	//  sig: signature string (64 bytes)
 	//  pk: public key string (32 bytes)
 	//	m: message to verify (string)
@@ -379,11 +383,11 @@ static int ln_ed25519_check(lua_State *L) {
 	const char *m = luaL_checklstring(L,3,&mln);	
 	if (sigln != 64) LERR("bad signature size");
 	if (pkln != 32) LERR("bad key size");
-	r = crypto_ed25519_check(sig, pk, m, mln);
+	r = crypto_check(sig, pk, m, mln);
 	// r == 0 if the signature matches
 	lua_pushboolean (L, (r == 0)); 
 	return 1;
-} // ln_ed25519_check()
+} // ln_check()
 
 //------------------------------------------------------------
 // argon2i password derivation
@@ -404,9 +408,10 @@ static int ln_argon2i(lua_State *L) {
 	unsigned char k[32];
 	size_t worksize = nkb * 1024;
 	unsigned char *work= malloc(worksize);
-	crypto_argon2i(	k, 32, pw, pwln, salt, saltln, 
-					"", 0, "", 0,  	// optional key and additional data
-					work, nkb, niters);
+	crypto_argon2i(	k, 32, work, nkb, niters,
+					pw, pwln, salt, saltln, 
+					"", 0, "", 0 	// optional key and additional data
+					);
 
 	lua_pushlstring (L, k, 32); 
 	free(work);
@@ -419,22 +424,25 @@ static int ln_argon2i(lua_State *L) {
 static const struct luaL_Reg luanachalib[] = {
 	{"randombytes", ln_randombytes},
 	//
-	{"ae_lock", ln_ae_lock},
-	{"ae_unlock", ln_ae_unlock},
+	{"lock", ln_lock},
+	{"unlock", ln_unlock},
 	//
 	{"x25519_keypair", ln_x25519_keypair},
 	{"x25519_public_key", ln_x25519_public_key},
-	{"lock_key", ln_lock_key},
+	{"keypair", ln_x25519_keypair},        // alias
+	{"public_key", ln_x25519_public_key},  // alias
+	{"key_exchange", ln_key_exchange},
+	{"dh_key", ln_key_exchange},           // alias
 	//
 	{"blake2b", ln_blake2b},
 	{"blake2b_init", ln_blake2b_init},
 	{"blake2b_update", ln_blake2b_update},
 	{"blake2b_final", ln_blake2b_final},
 	//
-	{"ed25519_keypair", ln_ed25519_keypair},
-	{"ed25519_public_key", ln_ed25519_public_key},	
-	{"ed25519_sign", ln_ed25519_sign},	
-	{"ed25519_check", ln_ed25519_check},	
+	{"sign_keypair", ln_sign_keypair},
+	{"sign_public_key", ln_sign_public_key},	
+	{"sign", ln_sign},	
+	{"check", ln_check},	
 	//
 	{"argon2i", ln_argon2i},	
 	//
