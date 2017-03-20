@@ -4,12 +4,10 @@
 /// Utilities ///
 /////////////////
 
-// By default, ed25519 uses blake2b.
-// sha512 is provided as an option for compatibility
-// and testability against official test vectors.
-// Compile with option -DED25519_SHA512 to use with sha512
-// If you do so, you must provide the "sha512" header with
-// suitable functions.
+// By default, signatures use blake2b. SHA-512 is provided as an
+// option for full ed25519 compatibility (a must for test vectors).
+// Compile with option -DED25519_SHA512 to use with sha512 If you do
+// so, you must provide the "sha512" header with suitable functions.
 #ifdef ED25519_SHA512
     #include "sha512.h"
     #define HASH crypto_sha512
@@ -42,15 +40,14 @@ static u32 load32_le(const u8 s[4])
 
 static u64 load64_le(const u8 s[8])
 {
-    return
-        ((u64)s[0]      ) ^
-        ((u64)s[1] <<  8) ^
-        ((u64)s[2] << 16) ^
-        ((u64)s[3] << 24) ^
-        ((u64)s[4] << 32) ^
-        ((u64)s[5] << 40) ^
-        ((u64)s[6] << 48) ^
-        ((u64)s[7] << 56);
+    return (u64)s[0]
+        | ((u64)s[1] <<  8)
+        | ((u64)s[2] << 16)
+        | ((u64)s[3] << 24)
+        | ((u64)s[4] << 32)
+        | ((u64)s[5] << 40)
+        | ((u64)s[6] << 48)
+        | ((u64)s[7] << 56);
 }
 
 sv store32_le(u8 output[4], u32 input)
@@ -187,7 +184,7 @@ void crypto_chacha20_encrypt(crypto_chacha_ctx *ctx,
         }
         // use the pool for encryption (or random stream)
         cipher_text[i] =
-            (plain_text == 0 ? 0 : plain_text[i])
+            (plain_text == 0 ? 0 : plain_text[i]) // ignore null plaintext
             ^ ctx->random_pool[ctx->pool_index];
         ctx->pool_index++;
     }
@@ -204,56 +201,54 @@ void crypto_chacha20_stream(crypto_chacha_ctx *ctx,
 /////////////////
 /// Poly 1305 ///
 /////////////////
-sv poly_load(u32 out[4], const u8 in[16])
-{
-    FOR (i, 0, 4) { out[i] = load32_le(in + i*4); }
-}
-
-sv poly_add(u32 out[5], const u32 a[5], const u32 b[5])
-{
-    u64 carry = 0;
-    FOR (i, 0, 5) {
-        carry  += (i64)(a[i]) + b[i];
-        out[i]  = carry & 0xffffffff; // lower 32 bits right there.
-        carry >>= 32;                 // retain the carry
-    }
-}
 
 // h = (h + c) * r
+// preconditions:
+//   ctx->h <= 7_ffffffff_ffffffff_ffffffff_ffffffff
+//   ctx->c <= 1_ffffffff_ffffffff_ffffffff_ffffffff
+//   ctx->r <=   0ffffffc_0ffffffc_0ffffffc_0fffffff
+// Postcondition:
+//   ctx->h <= 4_87ffffe4_8fffffe2_97ffffe0_9ffffffa
 sv poly_block(crypto_poly1305_ctx *ctx)
 {
-    // h + c, without carry propagation
-    const u64 h0 = ctx->h[0] + (u64)ctx->c[0];
-    const u64 h1 = ctx->h[1] + (u64)ctx->c[1];
-    const u64 h2 = ctx->h[2] + (u64)ctx->c[2];
-    const u64 h3 = ctx->h[3] + (u64)ctx->c[3];
-    const u64 h4 = ctx->h[4] + (u64)ctx->c[4];
+    // s = h + c, without carry propagation
+    const u64 s0 = ctx->h[0] + (u64)ctx->c[0]; // s0 <= 1_fffffffe
+    const u64 s1 = ctx->h[1] + (u64)ctx->c[1]; // s1 <= 1_fffffffe
+    const u64 s2 = ctx->h[2] + (u64)ctx->c[2]; // s2 <= 1_fffffffe
+    const u64 s3 = ctx->h[3] + (u64)ctx->c[3]; // s3 <= 1_fffffffe
+    const u64 s4 = ctx->h[4] + (u64)ctx->c[4]; // s4 <=   00000004
 
     // Local all the things!
-    const u64 r0 = ctx->r[0];
-    const u64 r1 = ctx->r[1];
-    const u64 r2 = ctx->r[2];
-    const u64 r3 = ctx->r[3];
-    const u64 rr0 = (ctx->r[0] >> 2) * 5; // lose 2 bottom bits...
-    const u64 rr1 = (ctx->r[1] >> 2) * 5; // 2 bottom bits already cleared
-    const u64 rr2 = (ctx->r[2] >> 2) * 5; // 2 bottom bits already cleared
-    const u64 rr3 = (ctx->r[3] >> 2) * 5; // 2 bottom bits already cleared
+    const u32 r0 = ctx->r[0];       // r0  <= 0fffffff
+    const u32 r1 = ctx->r[1];       // r1  <= 0ffffffc
+    const u32 r2 = ctx->r[2];       // r2  <= 0ffffffc
+    const u32 r3 = ctx->r[3];       // r3  <= 0ffffffc
+    const u32 rr0 = (r0 >> 2) * 5;  // rr0 <= 13fffffb // lose 2 bits...
+    const u32 rr1 = (r1 >> 2) + r1; // rr1 <= 13fffffb // * 5 trick
+    const u32 rr2 = (r2 >> 2) + r2; // rr2 <= 13fffffb // * 5 trick
+    const u32 rr3 = (r3 >> 2) + r3; // rr3 <= 13fffffb // * 5 trick
 
     // (h + c) * r, without carry propagation
-    const u64 x0 = h0*r0 + h1*rr3 + h2*rr2 + h3*rr1 + h4*rr0;
-    const u64 x1 = h0*r1 + h1*r0  + h2*rr3 + h3*rr2 + h4*rr1;
-    const u64 x2 = h0*r2 + h1*r1  + h2*r0  + h3*rr3 + h4*rr2;
-    const u64 x3 = h0*r3 + h1*r2  + h2*r1  + h3*r0  + h4*rr3;
-    const u64 x4 = h4 * (r0 & 3); // ...recover those 2 bits
+    const u64 x0 = s0*r0 + s1*rr3 + s2*rr2 + s3*rr1 + s4*rr0;//<=97ffffe007fffff8
+    const u64 x1 = s0*r1 + s1*r0  + s2*rr3 + s3*rr2 + s4*rr1;//<=8fffffe20ffffff6
+    const u64 x2 = s0*r2 + s1*r1  + s2*r0  + s3*rr3 + s4*rr2;//<=87ffffe417fffff4
+    const u64 x3 = s0*r3 + s1*r2  + s2*r1  + s3*r0  + s4*rr3;//<=7fffffe61ffffff2
+    const u32 x4 = s4 * (r0 & 3); // ...recover 2 bits       //<=0000000000000018
 
-    // carry propagation, put ctx->h under 2^130
-    const u64 msb = x4 + (x3 >> 32);
-    u64       u   = (msb >> 2) * 5; // lose 2 bottom bits...
-    u += (x0 & 0xffffffff)             ;  ctx->h[0] = u & 0xffffffff;  u >>= 32;
-    u += (x1 & 0xffffffff) + (x0 >> 32);  ctx->h[1] = u & 0xffffffff;  u >>= 32;
-    u += (x2 & 0xffffffff) + (x1 >> 32);  ctx->h[2] = u & 0xffffffff;  u >>= 32;
-    u += (x3 & 0xffffffff) + (x2 >> 32);  ctx->h[3] = u & 0xffffffff;  u >>= 32;
-    u += msb & 3 /* ...recover them */ ;  ctx->h[4] = u;
+    // partial reduction modulo 2^130 - 5
+    const u32 u5 = x4 + (x3 >> 32); // u5 <= 7ffffffe
+    const u64 u0 = (u5 >>  2) * 5 + (x0 & 0xffffffff);
+    const u64 u1 = (u0 >> 32)     + (x1 & 0xffffffff) + (x0 >> 32);
+    const u64 u2 = (u1 >> 32)     + (x2 & 0xffffffff) + (x1 >> 32);
+    const u64 u3 = (u2 >> 32)     + (x3 & 0xffffffff) + (x2 >> 32);
+    const u64 u4 = (u3 >> 32)     + (u5 & 3);
+
+    // Update the hash
+    ctx->h[0] = u0 & 0xffffffff; // u0 <= 1_9ffffffa
+    ctx->h[1] = u1 & 0xffffffff; // u1 <= 1_97ffffe0
+    ctx->h[2] = u2 & 0xffffffff; // u2 <= 1_8fffffe2
+    ctx->h[3] = u3 & 0xffffffff; // u3 <= 1_87ffffe4
+    ctx->h[4] = u4;              // u4 <=          4
 }
 
 // (re-)initializes the input counter and input buffer
@@ -265,68 +260,68 @@ sv poly_clear_c(crypto_poly1305_ctx *ctx)
 
 void crypto_poly1305_init(crypto_poly1305_ctx *ctx, const u8 key[32])
 {
-    // initial h: zero
-    FOR (i, 0, 5) { ctx->h [i] = 0; }
-    // initial r: first half of the key, minus a few bits
-    poly_load(ctx->r, key);
-    ctx->r[0] &= 0x0fffffff; // clear top 4 bits
-    ctx->r[1] &= 0x0ffffffc; // clear top 4 & bottom 2 bits
-    ctx->r[2] &= 0x0ffffffc; // clear top 4 & bottom 2 bits
-    ctx->r[3] &= 0x0ffffffc; // clear top 4 & bottom 2 bits
-    ctx->c[4]  = 1;
-    // second half of the key, saved for later
-    poly_load(ctx->pad, key + 16);
-    ctx->pad[4] = 0;
-    // buffer and counter
+    // constant init
+    FOR (i, 0, 5) { ctx->h [i] = 0; } // initial hash: zero
+    ctx->c  [4] = 1;                  // add 2^130 to every input block
+    ctx->pad[4] = 0;                  // poly_add() compatibility
     poly_clear_c(ctx);
+    // load r and pad (r has some of its bits cleared)
+    /**/            ctx->r  [0] = load32_le(key      ) & 0x0fffffff;
+    FOR (i, 1, 4) { ctx->r  [i] = load32_le(key + i*4) & 0x0ffffffc; }
+    FOR (i, 0, 4) { ctx->pad[i] = load32_le(key + i*4 + 16);         }
 }
 
 void crypto_poly1305_update(crypto_poly1305_ctx *ctx,
-                            const u8 *m, size_t bytes)
+                            const u8 *msg, size_t msg_size)
 {
-    while (bytes > 0) {
+    FOR (i, 0, msg_size) {
         if (ctx->c_index == 16) {
             poly_block(ctx);
             poly_clear_c(ctx);
         }
         // feed the input buffer
-        ctx->c[ctx->c_index / 4] |= *m << ((ctx->c_index % 4) * 8);
+        ctx->c[ctx->c_index / 4] |= msg[i] << ((ctx->c_index % 4) * 8);
         ctx->c_index++;
-        m++;
-        bytes--;
     }
 }
 
 void crypto_poly1305_final(crypto_poly1305_ctx *ctx, u8 mac[16])
 {
-    // move the final 1 according to remaining input length
-    ctx->c[4] = 0;
-    ctx->c[ctx->c_index / 4] |= 1 << ((ctx->c_index % 4) * 8);
-    // one last hash update...
-    poly_block(ctx);
-    // ... this time with full modular reduction
-    // We only need to conditionally subtract 2^130-5,
-    // using bit twidling to prevent timing attacks.
-    static const u32 minus_p[5] = { 5, 0, 0, 0, 0xfffffffc };
-    u32 h_minus_p[5];
-    poly_add(h_minus_p, ctx->h, minus_p);
-    u32 negative = ~(-(h_minus_p[4] >> 31)); // 0 or -1 (2's complement)
-    for (int i = 0; i < 5; i++) {
-        ctx->h[i] ^= negative & (ctx->h[i] ^ h_minus_p[i]);
+    // Process the last block (if any)
+    if (ctx->c_index != 0) {
+        // move the final 1 according to remaining input length
+        // (We may add less than 2^130 to the last input block)
+        ctx->c[4] = 0;
+        ctx->c[ctx->c_index / 4] |= 1 << ((ctx->c_index % 4) * 8);
+        // one last hash update
+        poly_block(ctx);
     }
-    // Add the secret pad to the final hash before output
-    poly_add(ctx->h, ctx->h, ctx->pad);
-    for (int i = 0; i < 4; i++)
-        store32_le(mac + i*4, ctx->h[i]);
+
+    // check if we should subtract 2^130-5 by performing the
+    // corresponding carry propagation.
+    u64 u = 5;
+    u += ctx->h[0];  u >>= 32;
+    u += ctx->h[1];  u >>= 32;
+    u += ctx->h[2];  u >>= 32;
+    u += ctx->h[3];  u >>= 32;
+    u += ctx->h[4];  u >>=  2;
+    // now u indicates how many times we should subtract 2^130-5 (0 or 1)
+
+    // store h + pad, minus 2^130-5 if u tells us to.
+    u *= 5;
+    u += (i64)(ctx->h[0]) + ctx->pad[0];  store32_le(mac     , u);  u >>= 32;
+    u += (i64)(ctx->h[1]) + ctx->pad[1];  store32_le(mac +  4, u);  u >>= 32;
+    u += (i64)(ctx->h[2]) + ctx->pad[2];  store32_le(mac +  8, u);  u >>= 32;
+    u += (i64)(ctx->h[3]) + ctx->pad[3];  store32_le(mac + 12, u);
 }
 
-void crypto_poly1305_auth(u8 mac[16], const u8 *m,
-                          size_t  m_size , const u8  key[32])
+void crypto_poly1305_auth(u8      mac[16],  const u8 *msg,
+                          size_t  msg_size, const u8  key[32])
 {
     crypto_poly1305_ctx ctx;
     crypto_poly1305_init  (&ctx, key);
-    crypto_poly1305_update(&ctx, m, m_size);
-    crypto_poly1305_final(&ctx, mac);
+    crypto_poly1305_update(&ctx, msg, msg_size);
+    crypto_poly1305_final (&ctx, mac);
 }
 
 ////////////////
@@ -400,22 +395,22 @@ sv blake2b_compress(crypto_blake2b_ctx *ctx, int last_block)
     FOR (i, 0, 8) { ctx->hash[i] ^= v[i] ^ v[i+8]; }
 }
 
-void crypto_blake2b_general_init(crypto_blake2b_ctx *ctx, size_t outlen,
-                                 const u8      *key, size_t keylen)
+void crypto_blake2b_general_init(crypto_blake2b_ctx *ctx, size_t out_size,
+                                 const u8           *key, size_t key_size)
 {
     // Initial hash == initialization vector...
     FOR (i, 0, 8) { ctx->hash[i] = blake2b_iv[i]; }
-    ctx->hash[0] ^= 0x01010000 ^ (keylen << 8) ^ outlen;  // ...mostly
+    ctx->hash[0] ^= 0x01010000 ^ (key_size << 8) ^ out_size;  // ...mostly
 
     ctx->input_size[0] = 0;       // input count low word
     ctx->input_size[1] = 0;       // input count high word
     ctx->c             = 0;       // pointer within buffer
-    ctx->output_size   = outlen;  // size of the final hash
+    ctx->output_size   = out_size;  // size of the final hash
 
     // If there's a key, put it in the first block, then pad with zeroes
-    if (keylen > 0) {
-        FOR (i, 0     , keylen) { ctx->buf[i] = key[i]; }
-        FOR (i, keylen, 128   ) { ctx->buf[i] = 0;      }
+    if (key_size > 0) {
+        FOR (i, 0     , key_size) { ctx->buf[i] = key[i]; }
+        FOR (i, key_size, 128   ) { ctx->buf[i] = 0;      }
         ctx->c = 128; // mark the block as used
     }
 }
@@ -425,9 +420,9 @@ void crypto_blake2b_init(crypto_blake2b_ctx *ctx)
     crypto_blake2b_general_init(ctx, 64, 0, 0);
 }
 
-void crypto_blake2b_update(crypto_blake2b_ctx *ctx, const u8 *in, size_t inlen)
+void crypto_blake2b_update(crypto_blake2b_ctx *ctx, const u8 *in, size_t in_size)
 {
-    FOR (i, 0, inlen) {
+    FOR (i, 0, in_size) {
         // If the buffer is full, increment the counters and
         // add (compress) the current buffer to the hash
         if (ctx->c == 128) {
@@ -450,23 +445,23 @@ void crypto_blake2b_final(crypto_blake2b_ctx *ctx, u8 *out)
 
     // copy the hash in the output (little endian of course)
     FOR (i, 0, ctx->output_size) {
-        out[i] = (ctx->hash[i / 8] >> (8 * (i & 7))) & 0xFF;
+        out[i] = (ctx->hash[i / 8] >> (8 * (i & 7))) & 0xff;
     }
 }
 
-void crypto_blake2b_general(u8       *out, size_t outlen,
-                            const u8 *key, size_t keylen,
-                            const u8 *in,  size_t inlen)
+void crypto_blake2b_general(u8       *out, size_t out_size,
+                            const u8 *key, size_t key_size,
+                            const u8 *in,  size_t in_size)
 {
     crypto_blake2b_ctx ctx;
-    crypto_blake2b_general_init(&ctx, outlen, key, keylen);
-    crypto_blake2b_update(&ctx, in, inlen);
+    crypto_blake2b_general_init(&ctx, out_size, key, key_size);
+    crypto_blake2b_update(&ctx, in, in_size);
     crypto_blake2b_final(&ctx, out);
 }
 
-void crypto_blake2b(u8 out[64], const u8 *in, size_t inlen)
+void crypto_blake2b(u8 out[64], const u8 *in, size_t in_size)
 {
-    crypto_blake2b_general(out, 64, 0, 0, in, inlen);
+    crypto_blake2b_general(out, 64, 0, 0, in, in_size);
 }
 
 
@@ -600,12 +595,9 @@ sv unary_g(block *work_block)
 
 typedef struct {
     block b;
-    u32   pass_number;
-    u32   slice_number;
-    u32   nb_blocks;
-    u32   nb_iterations;
-    u32   ctr;
-    u32   index;
+    u32 pass_number; u32 slice_number;
+    u32 nb_blocks; u32 nb_iterations;
+    u32 ctr; u32 offset;
 } gidx_ctx;
 
 sv gidx_refresh(gidx_ctx *ctx)
@@ -618,10 +610,10 @@ sv gidx_refresh(gidx_ctx *ctx)
     ctx->b.a[4] = ctx->nb_iterations;
     ctx->b.a[5] = 1;  // type: Argon2i
     ctx->b.a[6] = ctx->ctr;
-    FOR (i, 7, 128) { ctx->b.a[i] = 0; } // then zero the rest out
+    FOR (i, 7, 128) { ctx->b.a[i] = 0; } // ...then zero the rest out
 
     // Shuffle the block thus: ctx->b = G((G(ctx->b, zero)), zero)
-    // Applies the G "square" function to get cheap pseudo-random numbers.
+    // (G "square" function), to get cheap pseudo-random numbers.
     unary_g(&(ctx->b));
     unary_g(&(ctx->b));
 }
@@ -634,26 +626,30 @@ sv gidx_init(gidx_ctx *ctx,
     ctx->slice_number  = slice_number;
     ctx->nb_blocks     = nb_blocks;
     ctx->nb_iterations = nb_iterations;
-    ctx->ctr           = 1;   // not zero, surprisingly
-    ctx->index         = pass_number == 0 && slice_number == 0 ? 2 : 0;
-    // Quirk from the reference implementation: for the first pass,
-    // ctx->index is set at 2, because the first pseudo-random index
-    // we need is used for the *third* block of the segment.
-    // Setting it at zero every time wouldn't affect security.
-    gidx_refresh(ctx);
+    ctx->ctr           = 0;
+
+    // Offset from the begining of the segment.  For the first slice
+    // of the firs pass, we start at the *third* block, so the offset
+    // starts at 2, not 0.
+    if (pass_number != 0 || slice_number != 0) {
+        ctx->offset = 0;
+    } else {
+        ctx->offset = 2;
+        ctx->ctr++;         // Compensates for missed lazy creation
+        gidx_refresh(ctx);  // at the start of gidx_next()
+    }
 }
 
 static u32 gidx_next(gidx_ctx *ctx)
 {
-    // lazily creates the index block we need
-    if (ctx->index == 128) {
-        ctx->index = 0;
+    // lazily creates the offset block we need
+    if (ctx->offset % 128 == 0) {
         ctx->ctr++;
         gidx_refresh(ctx);
     }
-    // saves and increment the index
-    u32 index = ctx->index;
-    ctx->index++; // updates index for the next call
+    u32 index  = ctx->offset % 128; // save index  for current call
+    u32 offset = ctx->offset;       // save offset for current call
+    ctx->offset++;                  // update offset for next call
 
     // Computes the area size.
     // Pass 0 : all already finished segments plus already constructed
@@ -664,7 +660,7 @@ static u32 gidx_next(gidx_ctx *ctx)
     int first_pass = ctx->pass_number == 0;
     u32 slice_size = ctx->nb_blocks / 4;
     u32 area_size  = ((first_pass ? ctx->slice_number : 3)
-                      * slice_size + index - 1);
+                      * slice_size + offset - 1);
 
     // Computes the starting position of the reference area.
     // CONTRARY TO WHAT THE SPEC SUGGESTS, IT STARTS AT THE
@@ -674,7 +670,7 @@ static u32 gidx_next(gidx_ctx *ctx)
                       : (ctx->slice_number + 1) * slice_size);
     u32 start_pos  = first_pass ? 0 : next_slice;
 
-    // Generates the actual index from J1 (no need for J2, there's only one lane)
+    // Generate offset from J1 (no need for J2, there's only one lane)
     u64 j1         = ctx->b.a[index] & 0xffffffff; // pseudo-random number
     u64 x          = (j1 * j1)       >> 32;
     u64 y          = (area_size * x) >> 32;
@@ -801,16 +797,16 @@ static u32 load24_le(const u8 s[3])
 sv fe_carry(fe h, i64 t[10])
 {
     i64 c0, c1, c2, c3, c4, c5, c6, c7, c8, c9;
-    c9 = (t[9] + (i64) (1<<24)) >> 25; t[0] += c9 * 19; t[9] -= c9 << 25;
-    c1 = (t[1] + (i64) (1<<24)) >> 25; t[2] += c1;      t[1] -= c1 << 25;
-    c3 = (t[3] + (i64) (1<<24)) >> 25; t[4] += c3;      t[3] -= c3 << 25;
-    c5 = (t[5] + (i64) (1<<24)) >> 25; t[6] += c5;      t[5] -= c5 << 25;
-    c7 = (t[7] + (i64) (1<<24)) >> 25; t[8] += c7;      t[7] -= c7 << 25;
-    c0 = (t[0] + (i64) (1<<25)) >> 26; t[1] += c0;      t[0] -= c0 << 26;
-    c2 = (t[2] + (i64) (1<<25)) >> 26; t[3] += c2;      t[2] -= c2 << 26;
-    c4 = (t[4] + (i64) (1<<25)) >> 26; t[5] += c4;      t[4] -= c4 << 26;
-    c6 = (t[6] + (i64) (1<<25)) >> 26; t[7] += c6;      t[6] -= c6 << 26;
-    c8 = (t[8] + (i64) (1<<25)) >> 26; t[9] += c8;      t[8] -= c8 << 26;
+    c9 = (t[9] + (i64) (1<<24)) >> 25; t[0] += c9 * 19; t[9] -= (u64)c9 << 25;
+    c1 = (t[1] + (i64) (1<<24)) >> 25; t[2] += c1;      t[1] -= (u64)c1 << 25;
+    c3 = (t[3] + (i64) (1<<24)) >> 25; t[4] += c3;      t[3] -= (u64)c3 << 25;
+    c5 = (t[5] + (i64) (1<<24)) >> 25; t[6] += c5;      t[5] -= (u64)c5 << 25;
+    c7 = (t[7] + (i64) (1<<24)) >> 25; t[8] += c7;      t[7] -= (u64)c7 << 25;
+    c0 = (t[0] + (i64) (1<<25)) >> 26; t[1] += c0;      t[0] -= (u64)c0 << 26;
+    c2 = (t[2] + (i64) (1<<25)) >> 26; t[3] += c2;      t[2] -= (u64)c2 << 26;
+    c4 = (t[4] + (i64) (1<<25)) >> 26; t[5] += c4;      t[4] -= (u64)c4 << 26;
+    c6 = (t[6] + (i64) (1<<25)) >> 26; t[7] += c6;      t[6] -= (u64)c6 << 26;
+    c8 = (t[8] + (i64) (1<<25)) >> 26; t[9] += c8;      t[8] -= (u64)c8 << 26;
     FOR (i, 0, 10) { h[i] = t[i]; }
 }
 
@@ -872,18 +868,18 @@ sv fe_mul(fe h, const fe f, const fe g)
         +    f5*(i64)g4 + f6*(i64)g3 + f7*(i64)g2 + f8*(i64)g1 + f9*(i64)g0;
 
     i64 c0, c1, c2, c3, c4, c5, c6, c7, c8, c9;
-    c0 = (h0 + (i64) (1<<25)) >> 26; h1 += c0;      h0 -= c0 << 26;
-    c4 = (h4 + (i64) (1<<25)) >> 26; h5 += c4;      h4 -= c4 << 26;
-    c1 = (h1 + (i64) (1<<24)) >> 25; h2 += c1;      h1 -= c1 << 25;
-    c5 = (h5 + (i64) (1<<24)) >> 25; h6 += c5;      h5 -= c5 << 25;
-    c2 = (h2 + (i64) (1<<25)) >> 26; h3 += c2;      h2 -= c2 << 26;
-    c6 = (h6 + (i64) (1<<25)) >> 26; h7 += c6;      h6 -= c6 << 26;
-    c3 = (h3 + (i64) (1<<24)) >> 25; h4 += c3;      h3 -= c3 << 25;
-    c7 = (h7 + (i64) (1<<24)) >> 25; h8 += c7;      h7 -= c7 << 25;
-    c4 = (h4 + (i64) (1<<25)) >> 26; h5 += c4;      h4 -= c4 << 26;
-    c8 = (h8 + (i64) (1<<25)) >> 26; h9 += c8;      h8 -= c8 << 26;
-    c9 = (h9 + (i64) (1<<24)) >> 25; h0 += c9 * 19; h9 -= c9 << 25;
-    c0 = (h0 + (i64) (1<<25)) >> 26; h1 += c0;      h0 -= c0 << 26;
+    c0 = (h0 + (i64) (1<<25)) >> 26; h1 += c0;      h0 -= (u64)c0 << 26;
+    c4 = (h4 + (i64) (1<<25)) >> 26; h5 += c4;      h4 -= (u64)c4 << 26;
+    c1 = (h1 + (i64) (1<<24)) >> 25; h2 += c1;      h1 -= (u64)c1 << 25;
+    c5 = (h5 + (i64) (1<<24)) >> 25; h6 += c5;      h5 -= (u64)c5 << 25;
+    c2 = (h2 + (i64) (1<<25)) >> 26; h3 += c2;      h2 -= (u64)c2 << 26;
+    c6 = (h6 + (i64) (1<<25)) >> 26; h7 += c6;      h6 -= (u64)c6 << 26;
+    c3 = (h3 + (i64) (1<<24)) >> 25; h4 += c3;      h3 -= (u64)c3 << 25;
+    c7 = (h7 + (i64) (1<<24)) >> 25; h8 += c7;      h7 -= (u64)c7 << 25;
+    c4 = (h4 + (i64) (1<<25)) >> 26; h5 += c4;      h4 -= (u64)c4 << 26;
+    c8 = (h8 + (i64) (1<<25)) >> 26; h9 += c8;      h8 -= (u64)c8 << 26;
+    c9 = (h9 + (i64) (1<<24)) >> 25; h0 += c9 * 19; h9 -= (u64)c9 << 25;
+    c0 = (h0 + (i64) (1<<25)) >> 26; h1 += c0;      h0 -= (u64)c0 << 26;
 
     h[0] = h0;  h[1] = h1;  h[2] = h2;  h[3] = h3;  h[4] = h4;
     h[5] = h5;  h[6] = h6;  h[7] = h7;  h[8] = h8;  h[9] = h9;
@@ -909,7 +905,7 @@ sv fe_pow22523(fe out, const fe z) { fe_power(out, z, 252,  3); }
 
 sv fe_tobytes(u8 s[32], const fe h)
 {
-    i32 t[11];
+    i32 t[10];
     FOR (i, 0, 10) { t[i] = h[i]; }
 
     i32 q = (19 * t[9] + (((i32) 1) << 24)) >> 25;
@@ -918,16 +914,23 @@ sv fe_tobytes(u8 s[32], const fe h)
         q += t[2*i+1]; q >>= 25;
     }
     t[0] += 19 * q;
-    FOR (i, 0, 5) {
-        i32 carry;
-        carry = t[2*i  ] >> 26; t[2*i+1] += carry; t[2*i  ] -= carry << 26;
-        carry = t[2*i+1] >> 25; t[2*i+2] += carry; t[2*i+1] -= carry << 25;
-    }
+
+    i32 c0 = t[0] >> 26; t[1] += c0; t[0] -= (u64)c0 << 26;
+    i32 c1 = t[1] >> 25; t[2] += c1; t[1] -= (u64)c1 << 25;
+    i32 c2 = t[2] >> 26; t[3] += c2; t[2] -= (u64)c2 << 26;
+    i32 c3 = t[3] >> 25; t[4] += c3; t[3] -= (u64)c3 << 25;
+    i32 c4 = t[4] >> 26; t[5] += c4; t[4] -= (u64)c4 << 26;
+    i32 c5 = t[5] >> 25; t[6] += c5; t[5] -= (u64)c5 << 25;
+    i32 c6 = t[6] >> 26; t[7] += c6; t[6] -= (u64)c6 << 26;
+    i32 c7 = t[7] >> 25; t[8] += c7; t[7] -= (u64)c7 << 25;
+    i32 c8 = t[8] >> 26; t[9] += c8; t[8] -= (u64)c8 << 26;
+    i32 c9 = t[9] >> 25;             t[9] -= (u64)c9 << 25;
+
     store32_le(s +  0, ((u32)t[0] >>  0) | ((u32)t[1] << 26));
     store32_le(s +  4, ((u32)t[1] >>  6) | ((u32)t[2] << 19));
     store32_le(s +  8, ((u32)t[2] >> 13) | ((u32)t[3] << 13));
     store32_le(s + 12, ((u32)t[3] >> 19) | ((u32)t[4] <<  6));
-    store32_le(s + 16, ((u32)t[5] <<  0) | ((u32)t[6] << 25));
+    store32_le(s + 16, ((u32)t[5] >>  0) | ((u32)t[6] << 25));
     store32_le(s + 20, ((u32)t[6] >>  7) | ((u32)t[7] << 19));
     store32_le(s + 24, ((u32)t[7] >> 13) | ((u32)t[8] << 12));
     store32_le(s + 28, ((u32)t[8] >> 20) | ((u32)t[9] <<  6));
@@ -1067,26 +1070,26 @@ static int ge_frombytes_neg(ge *h, const u8 s[32])
     fe u, v, v3, vxx, check;
     fe_frombytes(h->Y, s);
     fe_1(h->Z);
-    fe_sq(u, h->Y);          // y^2
+    fe_sq(u, h->Y);            // y^2
     fe_mul(v, u, d);
-    fe_sub(u, u, h->Z);       // u = y^2-1
-    fe_add(v, v, h->Z);       // v = dy^2+1
+    fe_sub(u, u, h->Z);        // u = y^2-1
+    fe_add(v, v, h->Z);        // v = dy^2+1
 
     fe_sq(v3, v);
-    fe_mul(v3, v3, v);        // v3 = v^3
+    fe_mul(v3, v3, v);         // v3 = v^3
     fe_sq(h->X, v3);
     fe_mul(h->X, h->X, v);
-    fe_mul(h->X, h->X, u);    // x = uv^7
+    fe_mul(h->X, h->X, u);     // x = uv^7
 
-    fe_pow22523(h->X, h->X); // x = (uv^7)^((q-5)/8)
+    fe_pow22523(h->X, h->X);   // x = (uv^7)^((q-5)/8)
     fe_mul(h->X, h->X, v3);
-    fe_mul(h->X, h->X, u);    // x = uv^3(uv^7)^((q-5)/8)
+    fe_mul(h->X, h->X, u);     // x = uv^3(uv^7)^((q-5)/8)
 
     fe_sq(vxx, h->X);
     fe_mul(vxx, vxx, v);
-    fe_sub(check, vxx, u);    // vx^2-u
+    fe_sub(check, vxx, u);     // vx^2-u
     if (fe_isnonzero(check)) {
-        fe_add(check, vxx, u);  // vx^2+u
+        fe_add(check, vxx, u); // vx^2+u
         if (fe_isnonzero(check)) return -1;
         fe_mul(h->X, h->X, sqrtm1);
     }
@@ -1168,24 +1171,23 @@ sv modL(u8 *r, i64 x[64])
                                 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14,
                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10 };
-    unsigned i;
-    for (i = 63; i >= 32; i--) {
+    for (unsigned i = 63; i >= 32; i--) {
         i64 carry = 0;
         FOR (j, i-32, i-12) {
             x[j] += carry - 16 * x[i] * L[j - (i - 32)];
             carry = (x[j] + 128) >> 8;
-            x[j] -= carry << 8;
+            x[j] -= (u64)carry << 8;
         }
         x[i-12] += carry;
         x[i] = 0;
     }
     i64 carry = 0;
-    FOR(j, 0, 32) {
-        x[j] += carry - (x[31] >> 4) * L[j];
-        carry = x[j] >> 8;
-        x[j] &= 255;
+    FOR(i, 0, 32) {
+        x[i] += carry - (x[31] >> 4) * L[i];
+        carry = x[i] >> 8;
+        x[i] &= 255;
     }
-    FOR(j, 0, 32) { x[j] -= carry * L[j]; }
+    FOR(i, 0, 32) { x[i] -= carry * L[i]; }
     FOR(i, 0, 32) {
         x[i+1] += x[i] >> 8;
         r[i  ]  = x[i] & 255;
