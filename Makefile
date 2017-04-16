@@ -13,6 +13,8 @@
 LUADIR ?= ../lua
 LUA ?= $(LUADIR)/bin/lua
 LUAINC ?= $(LUADIR)/include
+LUALIBDIR ?= $(LUADIR)/lib
+LUALIB ?= lua
 
 # ----------------------------------------------------------------------
 
@@ -21,7 +23,7 @@ AR ?= ar
 
 INCFLAGS= -I$(LUAINC)
 CFLAGS= -Os -fPIC $(INCFLAGS) 
-LDFLAGS= -fPIC
+LDFLAGS= -fPIC -L$(LUALIBDIR) -l$(LUALIB)
 
 OBJS= luanacha.o monocypher.o randombytes.o
 
