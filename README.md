@@ -2,7 +2,7 @@
 
 LuaNacha (*NaCl with Chacha20*) is a small Lua cryptographic library wrapping the excellent Monocypher cryptographic C library by Loup Vaillant (http://loup-vaillant.fr/projects/monocypher/).
 
-The Monocypher library is included here (version 0.2)
+The Monocypher library is included here (currently version 0.6)
 
 Monocypher is itself heavily based on the NaCl crypto library by Daniel Bernstein and Tanja Lange.
 
