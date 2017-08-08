@@ -8,7 +8,9 @@ luanacha
 This is a Lua library wrapping the Monocypher library by Loup Vaillant.
 http://loup-vaillant.fr/projects/monocypher/
 
-Current Monocypher version is 0.2
+TODO   add the AEAD functions to the binding
+       (and/or replace the current "(un)lock-with-prefix" functions)
+170807 adjusted to monocypher-1.0.1
 
 The functions keep as much as possible the same name as in  Monocypher 
 (without the "crypto_" prefix)
@@ -23,6 +25,8 @@ randombytes(n)
 lock
 	authenticated encryption
 	with an optional prefix prepended to the encrypted text
+	(the prefix is only for convenience - eg to prepend the nonce.
+	The prefix is _not_ an AD)
 
 unlock
 	authenticated decryption
@@ -76,7 +80,7 @@ https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29
 
 */
 
-#define LUANACHA_VERSION "luanacha-0.2"
+#define LUANACHA_VERSION "luanacha-0.3"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -152,7 +156,9 @@ static int ln_lock(lua_State *L) {
 	if ((pfxln % 8) != 0) LERR("bad prefix size");
 	bufln = mln + 16 + pfxln;
 	unsigned char * buf = malloc(bufln);
-	crypto_lock(buf+pfxln, k, n, m, mln);
+	// monocypher-1.0: pass separately mac and encr.text
+	// mac is prepended to the encr text buffer
+	crypto_lock(buf+pfxln, buf+pfxln+16, k, n, m, mln);
 	if (pfxln > 0) {
 		memcpy(buf, pfx, pfxln);
 	}
@@ -180,7 +186,9 @@ static int ln_unlock(lua_State *L) {
 	
 	unsigned char * buf = malloc(cln);
 	boxln = cln - i;
-	r = crypto_unlock(buf, k, n, c+i, boxln);
+	// mac and encr text passed as two vars
+	// mac is at c+i, encr text is at c+i+16
+	r = crypto_unlock(buf, k, n, c+i, c+i+16, boxln-16);
 	if (r != 0) { 
 		free(buf); 
 		lua_pushnil (L);
@@ -311,7 +319,7 @@ static int ln_blake2b_final(lua_State *L) {
 	//
 	crypto_blake2b_ctx *ctx = (crypto_blake2b_ctx *) lua_touserdata(L, 1);
 	if (ctx == NULL) LERR("invalid ctx");	
-	int digln = ctx->output_size;
+	int digln = ctx->hash_size;
 	unsigned char dig[64];
     crypto_blake2b_final(ctx, dig);
 	free(ctx);
