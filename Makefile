@@ -21,13 +21,18 @@ AR ?= ar
 
 INCFLAGS= -I$(LUAINC)
 CFLAGS= -Os -fPIC $(INCFLAGS) 
-LDFLAGS= -fPIC
+
+# link flags for linux
+LDFLAGS= -shared -fPIC    
+
+# link flags for OSX
+# LDFLAGS=  -bundle -undefined dynamic_lookup -fPIC    
 
 OBJS= luanacha.o monocypher.o randombytes.o
 
 luanacha.so:  src/*.c src/*.h
 	$(CC) -c $(CFLAGS) src/*.c
-	$(CC) -shared $(LDFLAGS) -o luanacha.so $(OBJS)
+	$(CC)  $(LDFLAGS) -o luanacha.so $(OBJS)
 
 test:  luanacha.so
 	$(LUA) test_luanacha.lua
