@@ -1,0 +1,4 @@
+LIBRARY luanacha.dll
+VERSION 0.3
+EXPORTS
+luaopen_luanacha
