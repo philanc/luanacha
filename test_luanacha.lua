@@ -76,40 +76,64 @@ print("testing authenticated encryption...")
 -- to generate the poly1305 MAC key. So lock stream must be compared 
 -- with xchacha20 stream at offset 32.
 
--- xchacha test vector from
--- https://raw.githubusercontent.com/DaGenix/rust-crypto/master/src/chacha20.rs
-k = hextos"1b27556473e985d462cd51197a9a46c76009549eac6474f206c4ee0844f68389"
-n = hextos"69696ee955b62b73cd62bda875fc73d68219e0036b7a0b37"
-e = hextos(
-	"4febf2fe4b359c508dc5e8b5980c88e38946d8f18f313465c862a08782648248" ..
-	"018dacdcb904178853a46dca3a0eaaee747cba97434eaffad58fea8222047e0d" ..
-	"e6c3a6775106e0331ad714d2f27a55641340a1f1dd9f94532e68cb241cbdd150" ..
-	"970d14e05c5b173193fb14f51c41f393835bf7f416a7e0bba81ffb8b13af0e21" ..
-	"691d7ecec93b75e6e4183a")
-m = string.rep('\0', #e)
+-- xchacha test vector from libsodium-1.0.16
+-- see test/aead_xchacha20poly1305.c and aead_xchacha20poly1305.exp
+
+k = hextos[[ 
+	808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f ]]
+n = hextos[[ 07000000404142434445464748494a4b0000000000000000 ]]
+m = "Ladies and Gentlemen of the class of '99: If I could offer you "
+	.. "only one tip for the future, sunscreen would be it."
+e = hextos[[
+ 45 3c 06 93 a7 40 7f 04 ff 4c 56 ae db 17 a3 c0
+ a1 af ff 01 17 49 30 fc 22 28 7c 33 db cf 0a c8
+ b8 9a d9 29 53 0a 1b b3 ab 5e 69 f2 4c 7f 60 70
+ c8 f8 40 c9 ab b4 f6 9f bf c8 a7 ff 51 26 fa ee
+ bb b5 58 05 ee 9c 1c f2 ce 5a 57 26 32 87 ae c5
+ 78 0f 04 ec 32 4c 35 14 12 2c fc 32 31 fc 1a 8b
+ 71 8a 62 86 37 30 a2 70 2b b7 63 66 11 6b ed 09
+ e0 fd d4 c8 60 b7 07 4b e8 94 fa c9 69 73 99 be
+ 5c c1
+]]
 c = na.lock(k, n, m)
-assert(#c == #e+16)
--- the 32 first bytes of e are used for the MAC key
--- the first 16 bytes of c are the MAC
--- so we compare e:sub(33) with c:sub(17, #c-32)
---
---~ px(e, 'e')
+-- e is (encrypted .. mac) and c is (mac .. encrypted)
+assert(c:sub(17) .. c:sub(1, 16) == e)
+
+-- xchacha test vector from 
+-- https://github.com/golang/crypto/blob/master/chacha20poly1305/ 
+--   chacha20poly1305_vectors_test.go
+
+k = hextos[[ 
+	194b1190fa31d483c222ec475d2d6117710dd1ac19a6f1a1e8e894885b7fa631 ]]
+n = hextos[[ 6b07ea26bb1f2d92e04207b447f2fd1dd2086b442a7b6852 ]]
+m = hextos[[
+	f7e11b4d372ed7cb0c0e157f2f9488d8efea0f9bbe089a345f51bdc77e30d139
+	2813c5d22ca7e2c7dfc2e2d0da67efb2a559058d4de7a11bd2a2915e
+	]]
+e = hextos[[
+	25ae14585790d71d39a6e88632228a70b1f6a041839dc89a74701c06bfa7c4de
+	3288b7772cb2919818d95777ab58fe5480d6e49958f5d2481431014a8f88dab8
+	f7e08d2a9aebbe691430011d
+	]]
+c = na.lock(k, n, m)
 --~ px(c, 'c')
---~ px(c:sub(17, #c-32), 'c'); 
---~ px(e:sub(33), 'e')
-assert(e:sub(33) == c:sub(17, #c-32))
+--~ px(c:sub(17) .. c:sub(1, 16))
+assert(c:sub(17) .. c:sub(1, 16) == e)
 
-
--- xchacha test vector from libsodium
--- https://github.com/jedisct1/libsodium/blob/master/test/default/xchacha20.c
-k = hextos"eadc0e27f77113b5241f8ca9d6f9a5e7f09eee68d8a5cf30700563bf01060b4e"
-n = hextos"a171a4ef3fde7c4794c5b86170dc5a099b478f1b852f7b64"
-e = hextos(
-	"23839f61795c3cdbcee2c749a92543baeeea3cbb721402aa42e6cae140447575" ..
-	"f2916c5d71108e3b13357eaf86f060cb")
-m = string.rep('\0', #e)
+k = hextos[[ 
+	a60e09cd0bea16f26e54b62b2908687aa89722c298e69a3a22cf6cf1c46b7f8a ]]
+n = hextos[[ 92da9d67854c53597fc099b68d955be32df2f0d9efe93614 ]]
+m = hextos[[
+d266927ca40b2261d5a4722f3b4da0dd5bec74e103fab431702309fd0d0f1a259c767b956aa7348ca923d64c04f0a2e898b0670988b15e
+	]]
+e = hextos[[
+9dd6d05832f6b4d7f555a5a83930d6aed5423461d85f363efb6c474b6c4c8261b680dea393e24c2a3c8d1cc9db6df517423085833aa21f9ab5b42445b914f2313bcd205d179430
+	]]
 c = na.lock(k, n, m)
-assert(e:sub(33) == c:sub(17, #c-32))
+--~ px(c, 'c')
+--~ px(c:sub(17) .. c:sub(1, 16))
+assert(c:sub(17) .. c:sub(1, 16) == e)
+
 
 -- unlock
 m2, msg = na.unlock(k, n, c)

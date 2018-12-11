@@ -1,4 +1,4 @@
-// Copyright (c) 2017  Phil Leblanc  -- see LICENSE file
+// Copyright (c) 2018  Phil Leblanc  -- see LICENSE file
 // ---------------------------------------------------------------------
 
 /*
@@ -10,10 +10,10 @@ http://loup-vaillant.fr/projects/monocypher/
 
 TODO   add the AEAD functions to the binding
        (and/or replace the current "(un)lock-with-prefix" functions)
+       
+181211 adjusted to monocypher-2.0.5
 170807 adjusted to monocypher-1.0.1
 
-The functions keep as much as possible the same name as in  Monocypher 
-(without the "crypto_" prefix)
 
 luanachaAPI:
 
@@ -57,6 +57,8 @@ blake2b_final
 blake2b
 	compute the hash of a string (convenience function)
 
+argon2i
+	a blake2b-based Key Derivation Function
 
 
 --- Ed25519 signature
@@ -80,7 +82,7 @@ https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29
 
 */
 
-#define LUANACHA_VERSION "luanacha-0.3"
+#define LUANACHA_VERSION "luanacha-0.4"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -427,7 +429,7 @@ static int ln_argon2i(lua_State *L) {
 	unsigned char k[32];
 	size_t worksize = nkb * 1024;
 	unsigned char *work= malloc(worksize);
-	crypto_argon2i(	k, 32, work, nkb, niters,
+	crypto_argon2i_general(	k, 32, work, nkb, niters,
 					pw, pwln, salt, saltln, 
 					"", 0, "", 0 	// optional key and additional data
 					);
