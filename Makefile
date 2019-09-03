@@ -1,45 +1,38 @@
 
 # ----------------------------------------------------------------------
-# adjust the following according to your Lua install
-#
-#	LUADIR can be defined. In that case, 
-#   Lua binary and include files are to be found repectively in 
-#   $(LUADIR)/bin and $(LUADIR)/include
-#
-#	Or LUA and LUAINC can be directly defined as the path of the 
-#	Lua executable and the path of the Lua include directory,
-#	respectively.
-
-LUADIR ?= ../lua
-LUA ?= $(LUADIR)/bin/lua
-LUAINC ?= $(LUADIR)/include
-
+# Use environment variables to override the default options:
+#      CC, LUA, CFLAGS, FPIC, LUA_CFLAGS, LDFLAGS
+#  for example: CC=mips-linux-gcc LUA_LIB=lua5.2 make
 # ----------------------------------------------------------------------
 
+LUA ?= lua
+LUA_LIB ?= lua
 CC ?= gcc
-AR ?= ar
 
-INCFLAGS= -I$(LUAINC)
-CFLAGS= -Os -fPIC $(INCFLAGS) 
+FPIC ?= -fPIC
+CFLAGS ?= -Os
 
-# link flags for linux
-LDFLAGS= -shared -fPIC    
-
-# link flags for OSX
-# LDFLAGS=  -bundle -undefined dynamic_lookup -fPIC    
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+	LDFLAGS += -bundle -undefined dynamic_lookup
+endif
 
 OBJS= luanacha.o monocypher.o randombytes.o
 
-luanacha.so:  src/*.c src/*.h
-	$(CC) -c $(CFLAGS) src/*.c
-	$(CC)  $(LDFLAGS) -o luanacha.so $(OBJS)
+%.o: src/%.c
+	$(CC) $(LUA_CFLAGS) $(CFLAGS) $(LDFLAGS) $(FPIC) -c -o $@ $<
 
-test:  luanacha.so
+compile: $(OBJS)
+	$(CC) $(FPIC) -shared -o luanacha.so -l$(LUA_LIB) $(OBJS)
+
+test: compile
 	$(LUA) test_luanacha.lua
-	
+
 clean:
 	rm -f *.o *.a *.so
 
+install: compile
+	mkdir -p $(DESTDIR)
+	cp -pR luanacha.so $(DESTDIR)/
+
 .PHONY: clean test
-
-
