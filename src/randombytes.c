@@ -18,17 +18,17 @@
 
 int randombytes(unsigned char *x,unsigned long long xlen) {
 	HCRYPTPROV p;
-	ULONG i;
+	int r = 0;
 
 	if (CryptAcquireContext(&p, NULL, NULL,
 	  PROV_RSA_FULL, CRYPT_VERIFYCONTEXT) == FALSE) {
 		return(-1); 
 	}
 	if (CryptGenRandom(p, xlen, (BYTE *)x) == FALSE) {
-		return(-1); 
+		r = -1;
 	}
 	CryptReleaseContext(p, 0);
-	return 0;
+	return r;
 }	
 
 #else // unix
