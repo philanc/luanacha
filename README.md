@@ -1,7 +1,8 @@
 # LuaNacha
 
-LuaNacha (*NaCl with Chacha20*) is a small Lua cryptographic library wrapping the excellent Monocypher cryptographic C library by Loup Vaillant -  http://loup-vaillant.fr/projects/monocypher/
-and https://github.com/LoupVaillant/Monocypher 
+**2021-11-03  -- LuaNacha is deprecated. It is replaced by [LuaMonocypher](https://github.com/philanc/luamonocypher),** a cleaner and up to date Lua wrapper for the Monocypher cryptographic C library by Loup Vaillant. 
+
+---
 
 The Monocypher library is included here (currently version 2.0.5)
 
@@ -364,7 +365,7 @@ rights.
 ```
 
 
-The LuaNacha wrapper library is MIT-licensed.
+The luamonocypher wrapper library is MIT-licensed.
 
 
 
